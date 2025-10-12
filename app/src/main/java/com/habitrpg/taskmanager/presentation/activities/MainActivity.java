@@ -9,13 +9,13 @@ import androidx.navigation.Navigation;
 import androidx.navigation.ui.NavigationUI;
 
 import com.habitrpg.taskmanager.R;
-import com.habitrpg.taskmanager.business.auth.AuthManager;
+import com.habitrpg.taskmanager.service.AuthService;
 import com.habitrpg.taskmanager.databinding.ActivityMainBinding;
 
 public class MainActivity extends AppCompatActivity {
     
     private ActivityMainBinding binding;
-    private AuthManager authManager;
+    private AuthService authService;
     private NavController navController;
     
     @Override
@@ -26,11 +26,11 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         
-        // Initialize AuthManager
-        authManager = AuthManager.getInstance(this);
+        // Initialize AuthService
+        authService = AuthService.getInstance(this);
         
         // Check if user is logged in
-        if (!authManager.isUserLoggedIn()) {
+        if (!authService.isUserLoggedIn()) {
             navigateToLogin();
             return;
         }
@@ -81,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
     }
     
     private void navigateToLogin() {
-        Intent intent = new Intent(this, LoginActivity.class);
+        Intent intent = new Intent(this, AuthActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();

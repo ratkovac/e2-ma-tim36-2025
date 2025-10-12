@@ -13,19 +13,12 @@
         android:padding="24dp"
         android:gravity="center">
 
-        <!-- Logo/Title Section -->
-        <ImageView
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:layout_marginBottom="32dp"
-            android:src="@drawable/ic_launcher_foreground"
-            android:contentDescription="@string/app_name" />
-
+        <!-- Header -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Habit RPG"
-            android:textSize="28sp"
+            android:text="Welcome Back"
+            android:textSize="24sp"
             android:textStyle="bold"
             android:textColor="@color/primary_color"
             android:layout_marginBottom="8dp" />
@@ -33,10 +26,10 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Level up your life!"
+            android:text="Sign in to continue your adventure"
             android:textSize="16sp"
             android:textColor="@color/text_secondary"
-            android:layout_marginBottom="48dp" />
+            android:layout_marginBottom="32dp" />
 
         <!-- Login Form -->
         <com.google.android.material.textfield.TextInputLayout
@@ -75,7 +68,7 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginBottom="16dp"
-            android:text="Login"
+            android:text="Sign In"
             android:textSize="16sp"
             style="@style/Widget.Material3.Button" />
 
@@ -91,7 +84,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginTop="24dp">
+            android:layout_marginTop="16dp">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -103,7 +96,7 @@
                 android:id="@+id/tvRegister"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Sign up"
+                android:text="Sign Up"
                 android:textColor="@color/primary_color"
                 android:textStyle="bold"
                 android:clickable="true"

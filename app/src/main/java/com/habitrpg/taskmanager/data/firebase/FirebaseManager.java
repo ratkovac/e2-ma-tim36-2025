@@ -24,9 +24,8 @@ public class FirebaseManager {
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
         
-        // Enable offline persistence and configure settings
+        // Configure Firestore settings
         FirebaseFirestoreSettings settings = new FirebaseFirestoreSettings.Builder()
-            .setPersistenceEnabled(true)
             .build();
         db.setFirestoreSettings(settings);
     }
@@ -62,9 +61,6 @@ public class FirebaseManager {
         userData.put("powerPoints", user.getPowerPoints());
         userData.put("experiencePoints", user.getExperiencePoints());
         userData.put("coins", user.getCoins());
-        userData.put("activated", true); // AUTO-ACTIVATE for development
-        userData.put("activationToken", generateActivationToken());
-        userData.put("tokenExpiry", System.currentTimeMillis() + (24 * 60 * 60 * 1000)); // 24 hours
         userData.put("createdAt", System.currentTimeMillis());
         
         db.collection("users")
@@ -182,8 +178,18 @@ public class FirebaseManager {
         return taskData;
     }
     
-    private String generateActivationToken() {
-        return UUID.randomUUID().toString();
+    public void sendVerificationEmail(OnCompleteListener listener) {
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user != null) {
+            user.sendEmailVerification()
+                .addOnCompleteListener(task -> {
+                    if (listener != null) {
+                        listener.onComplete(task.isSuccessful(), task.getException());
+                    }
+                });
+        } else if (listener != null) {
+            listener.onComplete(false, new Exception("No user logged in"));
+        }
     }
     
     // Callback interfaces

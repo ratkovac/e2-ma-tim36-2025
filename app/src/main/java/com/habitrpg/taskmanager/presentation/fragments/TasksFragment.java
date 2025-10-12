@@ -10,7 +10,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
-import com.habitrpg.taskmanager.business.tasks.TaskManager;
+import com.habitrpg.taskmanager.service.TaskService;
 import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.databinding.FragmentTasksBinding;
 
@@ -22,7 +22,7 @@ import java.util.Locale;
 public class TasksFragment extends Fragment {
     
     private FragmentTasksBinding binding;
-    private TaskManager taskManager;
+    private TaskService taskService;
     
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -35,7 +35,7 @@ public class TasksFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         
-        taskManager = TaskManager.getInstance(requireContext());
+        taskService = TaskService.getInstance(requireContext());
         
         setupUI();
         loadTasks();
@@ -54,7 +54,7 @@ public class TasksFragment extends Fragment {
     }
     
     private void loadTasks() {
-        taskManager.getActiveTasks(new TaskManager.TaskListCallback() {
+        taskService.getActiveTasks(new TaskService.TaskListCallback() {
             @Override
             public void onTasksRetrieved(List<Task> tasks) {
                 if (getActivity() != null) {

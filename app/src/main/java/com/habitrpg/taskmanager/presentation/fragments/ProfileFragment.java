@@ -11,16 +11,16 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import com.habitrpg.taskmanager.business.auth.AuthManager;
-import com.habitrpg.taskmanager.business.xp.XPCalculator;
+import com.habitrpg.taskmanager.service.AuthService;
+import com.habitrpg.taskmanager.service.XPService;
 import com.habitrpg.taskmanager.data.database.entities.User;
 import com.habitrpg.taskmanager.databinding.FragmentProfileBinding;
-import com.habitrpg.taskmanager.presentation.activities.LoginActivity;
+import com.habitrpg.taskmanager.presentation.activities.AuthActivity;
 
 public class ProfileFragment extends Fragment {
     
     private FragmentProfileBinding binding;
-    private AuthManager authManager;
+    private AuthService authService;
     
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -33,7 +33,7 @@ public class ProfileFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         
-        authManager = AuthManager.getInstance(requireContext());
+        authService = AuthService.getInstance(requireContext());
         
         setupClickListeners();
         loadUserProfile();
@@ -51,7 +51,7 @@ public class ProfileFragment extends Fragment {
     private void loadUserProfile() {
         showLoading(true);
         
-        authManager.getCurrentUser(new AuthManager.UserCallback() {
+        authService.getCurrentUser(new AuthService.UserCallback() {
             @Override
             public void onUserRetrieved(User user) {
                 if (getActivity() != null) {
@@ -80,20 +80,20 @@ public class ProfileFragment extends Fragment {
         // Calculate and display XP progress
         int currentXP = user.getExperiencePoints();
         int currentLevel = user.getLevel();
-        int xpForNextLevel = XPCalculator.getXPRequiredForLevel(currentLevel + 1);
-        int totalXPForNextLevel = XPCalculator.getTotalXPRequiredForLevel(currentLevel + 1);
+        int xpForNextLevel = XPService.getXPRequiredForLevel(currentLevel + 1);
+        int totalXPForNextLevel = XPService.getTotalXPRequiredForLevel(currentLevel + 1);
         
-        float progress = XPCalculator.calculateLevelProgress(currentXP, currentLevel);
+        float progress = XPService.calculateLevelProgress(currentXP, currentLevel);
         binding.progressBarXP.setProgress((int) progress);
         
-        int xpRemaining = XPCalculator.getXPRemainingToNextLevel(currentXP, currentLevel);
+        int xpRemaining = XPService.getXPRemainingToNextLevel(currentXP, currentLevel);
         binding.tvXP.setText(currentXP + " / " + totalXPForNextLevel + " XP (" + xpRemaining + " to next level)");
         
         // TODO: Set avatar based on user.getAvatarId()
     }
     
     private void logoutUser() {
-        authManager.logoutUser(new AuthManager.AuthCallback() {
+        authService.logoutUser(new AuthService.AuthCallback() {
             @Override
             public void onSuccess(String message) {
                 if (getActivity() != null) {
@@ -116,7 +116,7 @@ public class ProfileFragment extends Fragment {
     }
     
     private void navigateToLogin() {
-        Intent intent = new Intent(getActivity(), LoginActivity.class);
+        Intent intent = new Intent(getActivity(), AuthActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         if (getActivity() != null) {
