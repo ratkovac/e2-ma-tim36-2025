@@ -73,10 +73,10 @@ public class MainActivity extends AppCompatActivity {
     
     private void setupClickListeners() {
         binding.fabAddTask.setOnClickListener(v -> {
-            // Navigate to task creation or show dialog
-            // For now, we'll navigate to tasks fragment
-            binding.bottomNavigation.setSelectedItemId(R.id.navigation_tasks);
-            // TODO: Show task creation dialog or navigate to create task screen
+            // Navigate to task creation fragment
+            if (navController != null) {
+                navController.navigate(R.id.navigation_task_creation);
+            }
         });
     }
     

@@ -19,4 +19,9 @@
         android:name="com.habitrpg.taskmanager.presentation.fragments.CategoriesFragment"
         android:label="Categories" />
 
+    <fragment
+        android:id="@+id/navigation_task_creation"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.TaskCreationFragment"
+        android:label="Create Task" />
+
 </navigation>

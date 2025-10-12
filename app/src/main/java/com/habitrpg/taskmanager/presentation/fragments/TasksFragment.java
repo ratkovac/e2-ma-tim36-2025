@@ -4,17 +4,20 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
+import com.habitrpg.taskmanager.presentation.adapters.TaskAdapter;
 import com.habitrpg.taskmanager.service.TaskService;
 import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.databinding.FragmentTasksBinding;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -23,6 +26,8 @@ public class TasksFragment extends Fragment {
     
     private FragmentTasksBinding binding;
     private TaskService taskService;
+    private TaskAdapter taskAdapter;
+    private List<Task> tasks;
     
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -36,6 +41,7 @@ public class TasksFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         
         taskService = TaskService.getInstance(requireContext());
+        tasks = new ArrayList<>();
         
         setupUI();
         loadTasks();
@@ -47,7 +53,30 @@ public class TasksFragment extends Fragment {
         binding.tvDate.setText(sdf.format(new Date()));
         
         // Setup RecyclerView
+        taskAdapter = new TaskAdapter(tasks, new TaskAdapter.OnTaskClickListener() {
+            @Override
+            public void onTaskClick(Task task) {
+                Toast.makeText(getContext(), "Task: " + task.getName(), Toast.LENGTH_SHORT).show();
+            }
+            
+            @Override
+            public void onTaskComplete(Task task) {
+                completeTask(task);
+            }
+            
+            @Override
+            public void onTaskEdit(Task task) {
+                Toast.makeText(getContext(), "Edit: " + task.getName(), Toast.LENGTH_SHORT).show();
+            }
+            
+            @Override
+            public void onTaskDelete(Task task) {
+                deleteTask(task);
+            }
+        });
+        
         binding.recyclerViewTasks.setLayoutManager(new LinearLayoutManager(getContext()));
+        binding.recyclerViewTasks.setAdapter(taskAdapter);
         
         // Initially show loading
         showLoading(true);
@@ -65,13 +94,49 @@ public class TasksFragment extends Fragment {
                             showEmptyState(true);
                         } else {
                             showEmptyState(false);
-                            // TODO: Set up adapter with tasks
-                            // TaskAdapter adapter = new TaskAdapter(tasks);
-                            // binding.recyclerViewTasks.setAdapter(adapter);
+                            TasksFragment.this.tasks.clear();
+                            TasksFragment.this.tasks.addAll(tasks);
+                            taskAdapter.updateTasks(tasks);
                         }
                     });
                 }
             }
+        });
+    }
+    
+    private void completeTask(Task task) {
+        taskService.completeTask(task.getId(), new TaskService.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {
+                Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+                loadTasks();
+            }
+            
+            @Override
+            public void onError(String error) {
+                Toast.makeText(getContext(), "Failed to complete task: " + error, Toast.LENGTH_SHORT).show();
+            }
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+        });
+    }
+    
+    private void deleteTask(Task task) {
+        taskService.cancelTask(task.getId(), new TaskService.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {
+                Toast.makeText(getContext(), "Task deleted successfully", Toast.LENGTH_SHORT).show();
+                loadTasks();
+            }
+            
+            @Override
+            public void onError(String error) {
+                Toast.makeText(getContext(), "Failed to delete task: " + error, Toast.LENGTH_SHORT).show();
+            }
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
         });
     }
     
@@ -89,7 +154,6 @@ public class TasksFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // Refresh tasks when fragment becomes visible
         loadTasks();
     }
     

@@ -1,15 +1,13 @@
 package com.habitrpg.taskmanager.service;
 
 import android.content.Context;
-import com.habitrpg.taskmanager.service.XPService;
-import com.habitrpg.taskmanager.data.database.AppDatabase;
 import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.data.database.entities.TaskCompletion;
 import com.habitrpg.taskmanager.data.database.entities.User;
-import com.habitrpg.taskmanager.data.firebase.FirebaseManager;
 import com.habitrpg.taskmanager.data.preferences.UserPreferences;
 import com.habitrpg.taskmanager.data.repository.TaskRepository;
 import com.habitrpg.taskmanager.data.repository.UserRepository;
+import com.habitrpg.taskmanager.service.XPService;
 import com.habitrpg.taskmanager.util.DateUtils;
 
 import java.util.List;
@@ -22,13 +20,11 @@ public class TaskService {
     private TaskRepository taskRepository;
     private UserRepository userRepository;
     private UserPreferences userPreferences;
-    private ExecutorService executor;
-    
+
     private TaskService(Context context) {
         taskRepository = TaskRepository.getInstance(context);
         userRepository = UserRepository.getInstance(context);
         userPreferences = UserPreferences.getInstance(context);
-        executor = Executors.newFixedThreadPool(2);
     }
     
     public static synchronized TaskService getInstance(Context context) {
@@ -56,27 +52,94 @@ public class TaskService {
             int xpValue = XPService.calculateTaskXP(task.getDifficulty(), task.getImportance());
             task.setXpValue(xpValue);
             
-            taskRepository.insertTask(task, new TaskRepository.TaskCallback() {
-                @Override
-                public void onSuccess(String message) {
-                    callback.onSuccess(message);
-                }
-                
-                @Override
-                public void onError(String error) {
-                    callback.onError(error);
-                }
-                
-                @Override
-                public void onTaskRetrieved(Task task) {}
-                
-                @Override
-                public void onTasksRetrieved(List<Task> tasks) {}
-                
-                @Override
-                public void onTaskCountRetrieved(int count) {}
-            });
+            if (task.isRecurring()) {
+                createRecurringTasks(task, callback);
+            } else {
+                createSingleTask(task, callback);
+            }
         });
+    }
+    
+    private void createSingleTask(Task task, TaskCallback callback) {
+        taskRepository.insertTask(task, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {
+                callback.onSuccess("Task created successfully!");
+            }
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private void createRecurringTasks(Task task, TaskCallback callback) {
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+            java.util.Date startDate = sdf.parse(task.getStartDate());
+            java.util.Date endDate = sdf.parse(task.getEndDate());
+            
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            cal.setTime(startDate);
+            
+            int taskCount = 0;
+            while (cal.getTime().before(endDate) || cal.getTime().equals(endDate)) {
+                Task recurringTask = new Task();
+                recurringTask.setUserId(task.getUserId());
+                recurringTask.setCategoryId(task.getCategoryId());
+                recurringTask.setName(task.getName());
+                recurringTask.setDescription(task.getDescription());
+                recurringTask.setDifficulty(task.getDifficulty());
+                recurringTask.setImportance(task.getImportance());
+                recurringTask.setXpValue(task.getXpValue());
+                recurringTask.setExecutionTime(task.getExecutionTime());
+                recurringTask.setRecurring(false);
+                recurringTask.setCreatedAt(System.currentTimeMillis());
+                
+                String taskDate = sdf.format(cal.getTime());
+                recurringTask.setName(task.getName() + " (" + taskDate + ")");
+                
+                taskRepository.insertTask(recurringTask, new TaskRepository.TaskCallback() {
+                    @Override
+                    public void onSuccess(String message) {}
+                    
+                    @Override
+                    public void onError(String error) {}
+                    
+                    @Override
+                    public void onTaskRetrieved(Task task) {}
+                    
+                    @Override
+                    public void onTasksRetrieved(List<Task> tasks) {}
+                    
+                    @Override
+                    public void onTaskCountRetrieved(int count) {}
+                });
+                
+                taskCount++;
+                
+                if ("day".equals(task.getRecurrenceUnit())) {
+                    cal.add(java.util.Calendar.DAY_OF_MONTH, task.getRecurrenceInterval());
+                } else if ("week".equals(task.getRecurrenceUnit())) {
+                    cal.add(java.util.Calendar.WEEK_OF_YEAR, task.getRecurrenceInterval());
+                }
+            }
+            
+            callback.onSuccess("Recurring task created successfully! Generated " + taskCount + " tasks.");
+            
+        } catch (Exception e) {
+            callback.onError("Failed to create recurring tasks: " + e.getMessage());
+        }
     }
     
     public void completeTask(int taskId, TaskCallback callback) {
@@ -580,6 +643,10 @@ public class TaskService {
         } else {
             callback.onValidationResult(true);
         }
+    }
+    
+    public String getCurrentUserId() {
+        return userPreferences.getCurrentUserId();
     }
     
     public interface TaskCountCallback {

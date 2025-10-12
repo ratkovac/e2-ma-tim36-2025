@@ -24,14 +24,12 @@ public class AuthService {
     private UserPreferences userPreferences;
     private UserRepository userRepository;
     private CategoryRepository categoryRepository;
-    private ExecutorService executor;
-    
+
     private AuthService(Context context) {
         firebaseManager = FirebaseManager.getInstance();
         userPreferences = UserPreferences.getInstance(context);
         userRepository = UserRepository.getInstance(context);
         categoryRepository = CategoryRepository.getInstance(context);
-        executor = Executors.newFixedThreadPool(2);
     }
     
     public static synchronized AuthService getInstance(Context context) {
@@ -97,31 +95,30 @@ public class AuthService {
                         User user = new User(userId, email, username, avatarId);
                         
                         userRepository.createUserDocument(user, new UserRepository.UserCallback() {
-                            @Override
-                            public void onSuccess(String message) {
-                                firebaseManager.sendVerificationEmail((emailSuccess, emailException) -> {
-                                    if (emailSuccess) {
-                                        userRepository.insertUser(user, new UserRepository.UserCallback() {
-                                            @Override
-                                            public void onSuccess(String message) {
-                                                createDefaultCategories(userId);
-                                                callback.onSuccess("Registration successful. Please check your email and click the verification link.");
-                                            }
-                                            
-                                            @Override
-                                            public void onError(String error) {
-                                                callback.onError("Failed to save user locally: " + error);
-                                            }
-                                            
-                                            @Override
-                                            public void onUserRetrieved(User user) {}
-                                        });
-                                    } else {
-                                        callback.onError("Registration successful but failed to send verification email: " + 
-                                            (emailException != null ? emailException.getMessage() : "Unknown error"));
-                                    }
-                                });
-                            }
+                                 @Override
+                                 public void onSuccess(String message) {
+                                     firebaseManager.sendVerificationEmail((emailSuccess, emailException) -> {
+                                         if (emailSuccess) {
+                                             userRepository.insertUser(user, new UserRepository.UserCallback() {
+                                                 @Override
+                                                 public void onSuccess(String message) {
+                                                     callback.onSuccess("Registration successful. Please check your email and click the verification link.");
+                                                 }
+
+                                                 @Override
+                                                 public void onError(String error) {
+                                                     callback.onError("Failed to save user locally: " + error);
+                                                 }
+
+                                                 @Override
+                                                 public void onUserRetrieved(User user) {}
+                                             });
+                                         } else {
+                                             callback.onError("Registration successful but failed to send verification email: " +
+                                                 (emailException != null ? emailException.getMessage() : "Unknown error"));
+                                         }
+                                     });
+                                 }
                             
                             @Override
                             public void onError(String error) {
@@ -207,28 +204,6 @@ public class AuthService {
                 });
         } else {
             callback.onError("No user logged in");
-        }
-    }
-    
-    public void createDefaultCategories(String userId) {
-        String[] defaultCategories = {"Health", "Study", "Work", "Personal"};
-        String[] defaultColors = {"#4CAF50", "#2196F3", "#FF9800", "#9C27B0"};
-        
-        for (int i = 0; i < defaultCategories.length; i++) {
-            Category category = new Category(userId, defaultCategories[i], defaultColors[i]);
-            categoryRepository.insertCategory(category, new CategoryRepository.CategoryCallback() {
-                @Override
-                public void onSuccess(String message) {}
-                
-                @Override
-                public void onError(String error) {}
-                
-                @Override
-                public void onCategoryRetrieved(Category category) {}
-                
-                @Override
-                public void onCategoriesRetrieved(List<Category> categories) {}
-            });
         }
     }
     
