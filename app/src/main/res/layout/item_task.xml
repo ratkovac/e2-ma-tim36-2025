@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    android:elevation="4dp"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="4dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Task Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <!-- Task Name -->
+            <TextView
+                android:id="@+id/tvTaskName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@android:color/black" />
+
+            <!-- Status -->
+            <TextView
+                android:id="@+id/tvTaskStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:padding="4dp"
+                android:background="@drawable/status_background"
+                android:textColor="@android:color/white" />
+
+        </LinearLayout>
+
+        <!-- Description -->
+        <TextView
+            android:id="@+id/tvTaskDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:textSize="14sp"
+            android:textColor="@android:color/darker_gray"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+        <!-- Task Details Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <!-- Difficulty -->
+            <TextView
+                android:id="@+id/tvTaskDifficulty"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="12sp"
+                android:textColor="@android:color/darker_gray"
+                android:drawableStart="@android:drawable/ic_menu_sort_by_size"
+                android:drawablePadding="4dp" />
+
+            <!-- Importance -->
+            <TextView
+                android:id="@+id/tvTaskImportance"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="12sp"
+                android:textColor="@android:color/darker_gray"
+                android:drawableStart="@android:drawable/ic_menu_edit"
+                android:drawablePadding="4dp" />
+
+            <!-- XP Value -->
+            <TextView
+                android:id="@+id/tvTaskXP"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="#4CAF50"
+                android:drawableStart="@android:drawable/ic_menu_add"
+                android:drawablePadding="4dp" />
+
+        </LinearLayout>
+
+        <!-- Execution Time -->
+        <TextView
+            android:id="@+id/tvTaskTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:textSize="12sp"
+            android:textColor="@android:color/darker_gray"
+            android:drawableStart="@android:drawable/ic_menu_edit"
+            android:drawablePadding="4dp" />
+
+        <!-- Action Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end">
+
+            <!-- Complete Button -->
+            <ImageView
+                android:id="@+id/btnComplete"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:src="@android:drawable/ic_menu_edit"
+                android:background="@drawable/button_background"
+                android:padding="6dp"
+                android:contentDescription="Complete task" />
+
+            <!-- Edit Button -->
+            <ImageView
+                android:id="@+id/btnEdit"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:src="@android:drawable/ic_menu_edit"
+                android:background="@drawable/button_background"
+                android:padding="6dp"
+                android:contentDescription="Edit task" />
+
+            <!-- Delete Button -->
+            <ImageView
+                android:id="@+id/btnDelete"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@android:drawable/ic_menu_delete"
+                android:background="@drawable/button_background"
+                android:padding="6dp"
+                android:contentDescription="Delete task" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

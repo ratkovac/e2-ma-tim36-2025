@@ -11,21 +11,21 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
-import com.habitrpg.taskmanager.data.database.AppDatabase;
 import com.habitrpg.taskmanager.data.database.entities.Category;
-import com.habitrpg.taskmanager.data.preferences.UserPreferences;
+import com.habitrpg.taskmanager.presentation.adapters.CategoryAdapter;
+import com.habitrpg.taskmanager.presentation.dialogs.CreateCategoryDialog;
+import com.habitrpg.taskmanager.service.CategoryService;
 import com.habitrpg.taskmanager.databinding.FragmentCategoriesBinding;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class CategoriesFragment extends Fragment {
     
     private FragmentCategoriesBinding binding;
-    private AppDatabase database;
-    private UserPreferences userPreferences;
-    private ExecutorService executor;
+    private CategoryService categoryService;
+    private CategoryAdapter categoryAdapter;
+    private List<Category> categories;
     
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -38,9 +38,8 @@ public class CategoriesFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         
-        database = AppDatabase.getDatabase(requireContext());
-        userPreferences = UserPreferences.getInstance(requireContext());
-        executor = Executors.newFixedThreadPool(2);
+        categoryService = CategoryService.getInstance(requireContext());
+        categories = new ArrayList<>();
         
         setupClickListeners();
         setupRecyclerView();
@@ -49,39 +48,69 @@ public class CategoriesFragment extends Fragment {
     
     private void setupClickListeners() {
         binding.btnAddCategory.setOnClickListener(v -> {
-            // TODO: Show add category dialog
-            Toast.makeText(getContext(), "Add category feature coming soon!", Toast.LENGTH_SHORT).show();
+            CreateCategoryDialog dialog = CreateCategoryDialog.newInstance(
+                categoryService, 
+                new CreateCategoryDialog.OnCategoryCreatedListener() {
+                    @Override
+                    public void onCategoryCreated(Category category) {
+                        loadCategories();
+                    }
+                }
+            );
+            dialog.show(getParentFragmentManager(), "CreateCategoryDialog");
         });
     }
     
     private void setupRecyclerView() {
+        categoryAdapter = new CategoryAdapter(categories, new CategoryAdapter.OnCategoryClickListener() {
+            @Override
+            public void onCategoryClick(Category category) {
+                Toast.makeText(getContext(), "Selected: " + category.getName(), Toast.LENGTH_SHORT).show();
+            }
+            
+            @Override
+            public void onCategoryLongClick(Category category) {
+                Toast.makeText(getContext(), "Long click: " + category.getName(), Toast.LENGTH_SHORT).show();
+            }
+        });
+        
         binding.recyclerViewCategories.setLayoutManager(new LinearLayoutManager(getContext()));
+        binding.recyclerViewCategories.setAdapter(categoryAdapter);
         showLoading(true);
     }
     
     private void loadCategories() {
-        String userId = userPreferences.getCurrentUserId();
-        if (userId == null) {
-            showEmptyState(true);
-            return;
-        }
-        
-        executor.execute(() -> {
-            List<Category> categories = database.categoryDao().getCategoriesByUserId(userId);
+        categoryService.getAllCategories(new CategoryService.CategoryCallback() {
+            @Override
+            public void onSuccess(String message) {}
             
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    showLoading(false);
-                    
-                    if (categories == null || categories.isEmpty()) {
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        showLoading(false);
                         showEmptyState(true);
-                    } else {
-                        showEmptyState(false);
-                        // TODO: Set up adapter with categories
-                        // CategoryAdapter adapter = new CategoryAdapter(categories);
-                        // binding.recyclerViewCategories.setAdapter(adapter);
-                    }
-                });
+                        Toast.makeText(getContext(), "Failed to load categories: " + error, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }
+            
+            @Override
+            public void onCategoriesRetrieved(List<Category> categories) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        showLoading(false);
+                        
+                        if (categories == null || categories.isEmpty()) {
+                            showEmptyState(true);
+                        } else {
+                            showEmptyState(false);
+                            CategoriesFragment.this.categories.clear();
+                            CategoriesFragment.this.categories.addAll(categories);
+                            categoryAdapter.updateCategories(categories);
+                        }
+                    });
+                }
             }
         });
     }
@@ -100,7 +129,6 @@ public class CategoriesFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // Refresh categories when fragment becomes visible
         loadCategories();
     }
     

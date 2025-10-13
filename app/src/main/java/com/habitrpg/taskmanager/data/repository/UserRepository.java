@@ -1,0 +1,123 @@
+package com.habitrpg.taskmanager.data.repository;
+
+import android.content.Context;
+import com.habitrpg.taskmanager.data.database.AppDatabase;
+import com.habitrpg.taskmanager.data.database.entities.User;
+import com.habitrpg.taskmanager.data.firebase.FirebaseManager;
+import com.habitrpg.taskmanager.data.preferences.UserPreferences;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class UserRepository {
+    
+    private static UserRepository instance;
+    private AppDatabase database;
+    private FirebaseManager firebaseManager;
+    private UserPreferences userPreferences;
+    private ExecutorService executor;
+    
+    private UserRepository(Context context) {
+        database = AppDatabase.getDatabase(context);
+        firebaseManager = FirebaseManager.getInstance();
+        userPreferences = UserPreferences.getInstance(context);
+        executor = Executors.newFixedThreadPool(2);
+    }
+    
+    public static synchronized UserRepository getInstance(Context context) {
+        if (instance == null) {
+            instance = new UserRepository(context.getApplicationContext());
+        }
+        return instance;
+    }
+    
+    public void getUserById(String userId, UserCallback callback) {
+        executor.execute(() -> {
+            try {
+                User user = database.userDao().getUserById(userId);
+                callback.onUserRetrieved(user);
+            } catch (Exception e) {
+                callback.onError("Failed to get user: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void getCurrentUser(UserCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId != null) {
+            getUserById(userId, callback);
+        } else {
+            callback.onUserRetrieved(null);
+        }
+    }
+    
+    public void insertUser(User user, UserCallback callback) {
+        executor.execute(() -> {
+            try {
+                database.userDao().insertUser(user);
+                callback.onSuccess("User inserted successfully");
+            } catch (Exception e) {
+                callback.onError("Failed to insert user: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void updateUser(User user, UserCallback callback) {
+        executor.execute(() -> {
+            try {
+                database.userDao().updateUser(user);
+                
+                firebaseManager.updateUserDocument(user, (success, exception) -> {
+                    if (success) {
+                        callback.onSuccess("User updated successfully");
+                    } else {
+                        callback.onError("Failed to sync user update: " + 
+                            (exception != null ? exception.getMessage() : "Unknown error"));
+                    }
+                });
+            } catch (Exception e) {
+                callback.onError("Failed to update user: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void loginUser(String userId, UserCallback callback) {
+        executor.execute(() -> {
+            try {
+                database.userDao().logoutAllUsers();
+                database.userDao().loginUser(userId);
+                callback.onSuccess("User logged in successfully");
+            } catch (Exception e) {
+                callback.onError("Failed to login user: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void logoutAllUsers(UserCallback callback) {
+        executor.execute(() -> {
+            try {
+                database.userDao().logoutAllUsers();
+                callback.onSuccess("All users logged out successfully");
+            } catch (Exception e) {
+                callback.onError("Failed to logout users: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void createUserDocument(User user, UserCallback callback) {
+        firebaseManager.createUserDocument(user, (success, exception) -> {
+            if (success) {
+                callback.onSuccess("User document created successfully");
+            } else {
+                callback.onError("Failed to create user document: " + 
+                    (exception != null ? exception.getMessage() : "Unknown error"));
+            }
+        });
+    }
+    
+    public interface UserCallback {
+        void onSuccess(String message);
+        void onError(String error);
+        void onUserRetrieved(User user);
+    }
+}

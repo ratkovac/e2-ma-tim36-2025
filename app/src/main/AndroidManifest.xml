@@ -15,9 +15,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TaskManager">
 
-        <!-- Login Activity - Main entry point -->
+        <!-- Auth Activity - Main entry point -->
         <activity
-            android:name="com.habitrpg.taskmanager.presentation.activities.LoginActivity"
+            android:name="com.habitrpg.taskmanager.presentation.activities.AuthActivity"
             android:exported="true"
             android:theme="@style/Theme.TaskManager">
             <intent-filter>
@@ -25,12 +25,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- Register Activity -->
-        <activity
-            android:name="com.habitrpg.taskmanager.presentation.activities.RegisterActivity"
-            android:exported="false"
-            android:theme="@style/Theme.TaskManager" />
 
         <!-- Main Activity -->
         <activity

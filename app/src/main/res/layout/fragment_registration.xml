@@ -113,10 +113,10 @@
 
             <ImageView
                 android:id="@+id/avatar1"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:layout_margin="8dp"
-                android:src="@drawable/ic_launcher_foreground"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_margin="6dp"
+                android:src="@drawable/creeper"
                 android:background="@drawable/avatar_selector"
                 android:clickable="true"
                 android:focusable="true"
@@ -124,10 +124,10 @@
 
             <ImageView
                 android:id="@+id/avatar2"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:layout_margin="8dp"
-                android:src="@drawable/ic_launcher_foreground"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_margin="6dp"
+                android:src="@drawable/grinch"
                 android:background="@drawable/avatar_selector"
                 android:clickable="true"
                 android:focusable="true"
@@ -135,10 +135,10 @@
 
             <ImageView
                 android:id="@+id/avatar3"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:layout_margin="8dp"
-                android:src="@drawable/ic_launcher_foreground"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_margin="6dp"
+                android:src="@drawable/shrek"
                 android:background="@drawable/avatar_selector"
                 android:clickable="true"
                 android:focusable="true"
@@ -146,10 +146,10 @@
 
             <ImageView
                 android:id="@+id/avatar4"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:layout_margin="8dp"
-                android:src="@drawable/ic_launcher_foreground"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_margin="6dp"
+                android:src="@drawable/transformers"
                 android:background="@drawable/avatar_selector"
                 android:clickable="true"
                 android:focusable="true"
@@ -157,10 +157,10 @@
 
             <ImageView
                 android:id="@+id/avatar5"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:layout_margin="8dp"
-                android:src="@drawable/ic_launcher_foreground"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_margin="6dp"
+                android:src="@drawable/spyro"
                 android:background="@drawable/avatar_selector"
                 android:clickable="true"
                 android:focusable="true"
@@ -201,7 +201,7 @@
                 android:id="@+id/tvLogin"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Login"
+                android:text="Sign In"
                 android:textColor="@color/primary_color"
                 android:textStyle="bold"
                 android:clickable="true"

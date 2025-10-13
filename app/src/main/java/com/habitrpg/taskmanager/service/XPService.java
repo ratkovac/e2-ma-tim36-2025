@@ -1,34 +1,27 @@
-package com.habitrpg.taskmanager.business.xp;
+package com.habitrpg.taskmanager.service;
 
-public class XPCalculator {
+public class XPService {
     
-    // Difficulty XP values
+    // XP Constants
     public static final int VERY_EASY_XP = 1;
     public static final int EASY_XP = 3;
     public static final int HARD_XP = 7;
     public static final int EXTREME_XP = 20;
     
-    // Importance XP values
     public static final int NORMAL_XP = 1;
     public static final int IMPORTANT_XP = 3;
     public static final int VERY_IMPORTANT_XP = 10;
     public static final int SPECIAL_XP = 100;
     
-    // Level system constants
     public static final int LEVEL_1_XP_REQUIREMENT = 200;
     
-    /**
-     * Calculate XP value for a task based on difficulty and importance
-     */
+    // XP Calculation Methods
     public static int calculateTaskXP(String difficulty, String importance) {
         int difficultyXP = getDifficultyXP(difficulty);
         int importanceXP = getImportanceXP(importance);
         return difficultyXP + importanceXP;
     }
     
-    /**
-     * Get XP value for difficulty level
-     */
     public static int getDifficultyXP(String difficulty) {
         switch (difficulty.toLowerCase()) {
             case "very_easy":
@@ -44,9 +37,6 @@ public class XPCalculator {
         }
     }
     
-    /**
-     * Get XP value for importance level
-     */
     public static int getImportanceXP(String importance) {
         switch (importance.toLowerCase()) {
             case "normal":
@@ -62,10 +52,6 @@ public class XPCalculator {
         }
     }
     
-    /**
-     * Calculate required XP for a specific level
-     * Formula: Level 1 requires 200 XP, then previous_xp * 2 + previous_xp / 2
-     */
     public static int getXPRequiredForLevel(int level) {
         if (level <= 1) {
             return LEVEL_1_XP_REQUIREMENT;
@@ -75,9 +61,6 @@ public class XPCalculator {
         return previousLevelXP * 2 + previousLevelXP / 2;
     }
     
-    /**
-     * Calculate total XP required up to a specific level
-     */
     public static int getTotalXPRequiredForLevel(int level) {
         int totalXP = 0;
         for (int i = 1; i <= level; i++) {
@@ -86,9 +69,6 @@ public class XPCalculator {
         return totalXP;
     }
     
-    /**
-     * Calculate user's level based on total XP
-     */
     public static int calculateLevelFromXP(int totalXP) {
         int level = 1;
         int xpAccumulated = 0;
@@ -98,12 +78,9 @@ public class XPCalculator {
             level++;
         }
         
-        return level - 1; // Return the completed level
+        return level - 1;
     }
     
-    /**
-     * Calculate progress percentage to next level
-     */
     public static float calculateLevelProgress(int currentXP, int currentLevel) {
         int xpForCurrentLevel = getTotalXPRequiredForLevel(currentLevel);
         int xpForNextLevel = getTotalXPRequiredForLevel(currentLevel + 1);
@@ -115,26 +92,11 @@ public class XPCalculator {
         return Math.max(0f, Math.min(100f, (float) xpProgressToNextLevel / xpNeededForNextLevel * 100f));
     }
     
-    /**
-     * Get XP remaining to reach next level
-     */
     public static int getXPRemainingToNextLevel(int currentXP, int currentLevel) {
         int xpForNextLevel = getTotalXPRequiredForLevel(currentLevel + 1);
         return Math.max(0, xpForNextLevel - currentXP);
     }
     
-    /**
-     * Check if user leveled up after gaining XP
-     */
-    public static boolean didLevelUp(int previousXP, int newXP) {
-        int previousLevel = calculateLevelFromXP(previousXP);
-        int newLevel = calculateLevelFromXP(newXP);
-        return newLevel > previousLevel;
-    }
-    
-    /**
-     * Get appropriate title for level
-     */
     public static String getTitleForLevel(int level) {
         if (level >= 50) return "Grandmaster";
         if (level >= 40) return "Master";
