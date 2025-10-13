@@ -49,14 +49,33 @@ public class TaskService {
                 return;
             }
             
-            int xpValue = XPService.calculateTaskXP(task.getDifficulty(), task.getImportance());
-            task.setXpValue(xpValue);
-            
-            if (task.isRecurring()) {
-                createRecurringTasks(task, callback);
-            } else {
-                createSingleTask(task, callback);
-            }
+            // Get user level for XP calculation
+            userRepository.getUserById(userId, new UserRepository.UserCallback() {
+                @Override
+                public void onSuccess(String message) {}
+                
+                @Override
+                public void onError(String error) {
+                    callback.onError("Failed to get user data: " + error);
+                }
+                
+                @Override
+                public void onUserRetrieved(User user) {
+                    if (user != null) {
+                        int userLevel = user.getLevel();
+                        int xpValue = XPService.calculateTaskXP(task.getDifficulty(), task.getImportance(), userLevel);
+                        task.setXpValue(xpValue);
+                        
+                        if (task.isRecurring()) {
+                            createRecurringTasks(task, callback);
+                        } else {
+                            createSingleTask(task, callback);
+                        }
+                    } else {
+                        callback.onError("User not found");
+                    }
+                }
+            });
         });
     }
     
@@ -253,12 +272,22 @@ public class TaskService {
                     user.setExperiencePoints(newXP);
                     
                     boolean leveledUp;
+                    final int ppEarned;
                     if (newLevel > oldLevel) {
                         user.setLevel(newLevel);
                         user.setTitle(XPService.getTitleForLevel(newLevel));
                         leveledUp = true;
+                        
+                        // Calculate PP rewards for all levels gained
+                        int totalPPEarned = 0;
+                        for (int level = oldLevel + 1; level <= newLevel; level++) {
+                            totalPPEarned += XPService.getPPRewardForLevel(level);
+                        }
+                        user.setPowerPoints(user.getPowerPoints() + totalPPEarned);
+                        ppEarned = totalPPEarned;
                     } else {
                         leveledUp = false;
+                        ppEarned = 0;
                     }
 
                     userRepository.updateUser(user, new UserRepository.UserCallback() {
@@ -267,6 +296,9 @@ public class TaskService {
                             String resultMessage = "Task completed! +" + task.getXpValue() + " XP";
                             if (leveledUp) {
                                 resultMessage += "\nLevel up! You are now level " + newLevel + " (" + user.getTitle() + ")";
+                                if (ppEarned > 0) {
+                                    resultMessage += "\n+" + ppEarned + " Power Points earned!";
+                                }
                             }
                             callback.onSuccess(resultMessage);
                         }

@@ -9,8 +9,10 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
+import com.habitrpg.taskmanager.R;
 import com.habitrpg.taskmanager.presentation.adapters.TaskAdapter;
 import com.habitrpg.taskmanager.service.TaskService;
 import com.habitrpg.taskmanager.data.database.entities.Task;
@@ -44,6 +46,7 @@ public class TasksFragment extends Fragment {
         tasks = new ArrayList<>();
         
         setupUI();
+        setupClickListeners();
         loadTasks();
     }
     
@@ -80,6 +83,13 @@ public class TasksFragment extends Fragment {
         
         // Initially show loading
         showLoading(true);
+    }
+    
+    private void setupClickListeners() {
+        binding.fabAddTask.setOnClickListener(v -> {
+            // Navigate to task creation fragment
+            Navigation.findNavController(v).navigate(R.id.navigation_task_creation);
+        });
     }
     
     private void loadTasks() {

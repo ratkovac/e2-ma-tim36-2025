@@ -27,8 +27,12 @@ android {
     }
 
     buildTypes {
-        release {
+        debug {
             minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        release {
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -74,6 +78,13 @@ dependencies {
     
     // Coroutines (for future async operations)
     implementation libs.kotlinx.coroutines.android
+    
+    // ZXing for QR Code generation
+    implementation 'com.google.zxing:core:3.5.2'
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    
+    // MPAndroidChart for statistics graphs
+    implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
     
     // Testing
     testImplementation libs.junit

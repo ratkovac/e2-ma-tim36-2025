@@ -12,4 +12,12 @@
         android:id="@+id/navigation_categories"
         android:icon="@drawable/ic_categories"
         android:title="Categories" />
+    <item
+        android:id="@+id/navigation_statistics"
+        android:icon="@drawable/ic_statistics"
+        android:title="Statistics" />
+    <item
+        android:id="@+id/navigation_level_progress"
+        android:icon="@drawable/ic_level_progress"
+        android:title="Level Progress" />
 </menu>
