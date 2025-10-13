@@ -17,7 +17,7 @@
         android:icon="@drawable/ic_statistics"
         android:title="Statistics" />
     <item
-        android:id="@+id/navigation_level_progress"
-        android:icon="@drawable/ic_level_progress"
-        android:title="Level Progress" />
+        android:id="@+id/navigation_friends"
+        android:icon="@android:drawable/ic_menu_myplaces"
+        android:title="Friends" />
 </menu>

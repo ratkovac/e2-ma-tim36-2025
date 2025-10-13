@@ -12,6 +12,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.Navigation;
 
 import com.habitrpg.taskmanager.presentation.dialogs.ChangePasswordDialog;
 import com.habitrpg.taskmanager.R;
@@ -51,6 +52,7 @@ public class ProfileFragment extends Fragment {
         binding.btnGenerateQR.setOnClickListener(v -> generateQRCode());
         binding.btnViewBadges.setOnClickListener(v -> showBadges());
         binding.btnViewEquipment.setOnClickListener(v -> showEquipment());
+        binding.btnLevelProgress.setOnClickListener(v -> showLevelProgress());
     }
 
     private void showChangePasswordDialog() {
@@ -90,6 +92,10 @@ public class ProfileFragment extends Fragment {
 
     private void showEquipment() {
         Toast.makeText(getContext(), "Equipment feature coming soon!", Toast.LENGTH_SHORT).show();
+    }
+
+    private void showLevelProgress() {
+        Navigation.findNavController(requireView()).navigate(R.id.navigation_level_progress);
     }
 
     private void loadUserProfile() {

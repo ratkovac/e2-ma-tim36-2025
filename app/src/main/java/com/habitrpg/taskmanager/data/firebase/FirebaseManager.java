@@ -12,6 +12,10 @@ import com.habitrpg.taskmanager.data.database.entities.Category;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.List;
+import java.util.ArrayList;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 
 public class FirebaseManager {
     
@@ -124,11 +128,75 @@ public class FirebaseManager {
         }
     }
     
+    // Friend system methods
+    public void searchUsersByUsername(String username, UserSearchListener listener) {
+        db.collection("users")
+            .get()
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    List<User> users = new ArrayList<>();
+                    String searchQuery = username.toLowerCase().trim();
+                    
+                    for (QueryDocumentSnapshot document : task.getResult()) {
+                        Map<String, Object> data = document.getData();
+                        String documentUsername = (String) data.get("username");
+                        
+                        // Check if username contains the search query (case insensitive)
+                        if (documentUsername != null && documentUsername.toLowerCase().contains(searchQuery)) {
+                            User user = new User();
+                            user.setId(document.getId());
+                            user.setUsername(documentUsername);
+                            user.setEmail((String) data.get("email"));
+                            user.setAvatarId(((Number) data.get("avatarId")).intValue());
+                            users.add(user);
+                        }
+                    }
+                    listener.onUsersFound(users);
+                } else {
+                    listener.onError("Failed to search users: " + task.getException().getMessage());
+                }
+            });
+    }
+    
+    public void getUserByUsername(String username, UserListener listener) {
+        db.collection("users")
+            .whereEqualTo("username", username)
+            .limit(1)
+            .get()
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful() && !task.getResult().isEmpty()) {
+                    QueryDocumentSnapshot document = (QueryDocumentSnapshot) task.getResult().getDocuments().get(0);
+                    Map<String, Object> data = document.getData();
+                    User user = new User();
+                    user.setId(document.getId());
+                    user.setUsername((String) data.get("username"));
+                    user.setEmail((String) data.get("email"));
+                    user.setAvatarId(((Number) data.get("avatarId")).intValue());
+                    listener.onUserRetrieved(user);
+                } else {
+                    listener.onUserRetrieved(null);
+                }
+            })
+            .addOnFailureListener(e -> {
+                listener.onError("Failed to get user: " + e.getMessage());
+            });
+    }
+    
     public interface OnCompleteListener {
         void onComplete(boolean success, Exception exception);
     }
     
     public interface OnUserRetrievedListener {
         void onUserRetrieved(Map<String, Object> userData);
+    }
+    
+    public interface UserSearchListener {
+        void onUsersFound(List<User> users);
+        void onError(String error);
+    }
+    
+    public interface UserListener {
+        void onUserRetrieved(User user);
+        void onError(String error);
     }
 }

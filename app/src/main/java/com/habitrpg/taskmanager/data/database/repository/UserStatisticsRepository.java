@@ -10,15 +10,31 @@ import java.util.concurrent.Executors;
 
 public class UserStatisticsRepository {
     
+    private static UserStatisticsRepository instance;
     private AppDatabase database;
     private ExecutorService executor;
     
-    public UserStatisticsRepository(Context context) {
+    private UserStatisticsRepository(Context context) {
         database = AppDatabase.getDatabase(context);
         executor = Executors.newFixedThreadPool(2);
     }
     
+    public static synchronized UserStatisticsRepository getInstance(Context context) {
+        if (instance == null) {
+            instance = new UserStatisticsRepository(context.getApplicationContext());
+        }
+        return instance;
+    }
+    
+    private void ensureExecutorActive() {
+        if (executor.isShutdown()) {
+            executor = Executors.newFixedThreadPool(2);
+        }
+    }
+    
     public void insertUserStatistics(UserStatistics userStatistics, UserStatisticsCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.userStatisticsDao().insertUserStatistics(userStatistics);
@@ -34,6 +50,8 @@ public class UserStatisticsRepository {
     }
     
     public void updateUserStatistics(UserStatistics userStatistics, UserStatisticsCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.userStatisticsDao().updateUserStatistics(userStatistics);
@@ -49,6 +67,8 @@ public class UserStatisticsRepository {
     }
     
     public void getUserStatisticsByUserId(String userId, UserStatisticsCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 UserStatistics statistics = database.userStatisticsDao().getUserStatisticsByUserId(userId);
@@ -64,6 +84,8 @@ public class UserStatisticsRepository {
     }
     
     public void deleteUserStatisticsByUserId(String userId, UserStatisticsCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.userStatisticsDao().deleteUserStatisticsByUserId(userId);
