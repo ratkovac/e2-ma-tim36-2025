@@ -66,20 +66,17 @@ public class LevelProgressFragment extends Fragment {
         binding.tvCurrentXP.setText(String.valueOf(totalXP));
 
         // Calculate XP for current level progress
-        int xpForCurrentLevel = XPService.getTotalXPRequiredForLevel(currentLevel);
         int xpForNextLevel = XPService.getTotalXPRequiredForLevel(currentLevel + 1);
-        int xpNeededForThisLevel = xpForNextLevel - xpForCurrentLevel;
-        int xpProgressInThisLevel = totalXP - xpForCurrentLevel;
         int xpRemaining = xpForNextLevel - totalXP;
 
         // Calculate and set progress bar
         float progress = XPService.calculateLevelProgress(totalXP, currentLevel);
         binding.progressBarLevel.setProgress((int) progress);
 
-        // Update progress text - show progress within current level
+        // Update progress text - show total XP / total XP needed for next level
         binding.tvLevelProgress.setText(
                 String.format("%d / %d XP (%d to next level)",
-                        xpProgressInThisLevel, xpNeededForThisLevel, xpRemaining)
+                        totalXP, xpForNextLevel, xpRemaining)
         );
 
         // Update next level info
