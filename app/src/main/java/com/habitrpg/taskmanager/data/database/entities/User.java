@@ -18,7 +18,7 @@ public class User {
     @ColumnInfo(name = "avatar_id")
     private int avatarId;
     
-    private int level = 0;
+    private int level = 1;
     private String title = "Beginner";
     
     @ColumnInfo(name = "power_points")
@@ -27,7 +27,7 @@ public class User {
     @ColumnInfo(name = "experience_points")
     private int experiencePoints = 0;
     
-    private int coins = 0;
+    private int coins = 300;
     
     @ColumnInfo(name = "is_logged_in")
     private boolean isLoggedIn = false;

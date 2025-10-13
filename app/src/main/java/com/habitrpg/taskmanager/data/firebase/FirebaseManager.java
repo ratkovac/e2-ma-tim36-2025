@@ -7,7 +7,6 @@ import com.google.firebase.firestore.FirebaseFirestoreSettings;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.CollectionReference;
 import com.habitrpg.taskmanager.data.database.entities.User;
-import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.data.database.entities.Category;
 
 import java.util.HashMap;
@@ -24,7 +23,6 @@ public class FirebaseManager {
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
         
-        // Configure Firestore settings
         FirebaseFirestoreSettings settings = new FirebaseFirestoreSettings.Builder()
             .build();
         db.setFirestoreSettings(settings);
@@ -37,7 +35,6 @@ public class FirebaseManager {
         return instance;
     }
     
-    // Authentication methods
     public FirebaseAuth getAuth() {
         return mAuth;
     }
@@ -50,7 +47,6 @@ public class FirebaseManager {
         return getCurrentUser() != null;
     }
     
-    // User management
     public void createUserDocument(User user, OnCompleteListener listener) {
         Map<String, Object> userData = new HashMap<>();
         userData.put("email", user.getEmail());
@@ -114,70 +110,6 @@ public class FirebaseManager {
             });
     }
     
-    // Task management
-    public void saveTask(Task task, OnCompleteListener listener) {
-        Map<String, Object> taskData = createTaskMap(task);
-        
-        db.collection("tasks")
-            .add(taskData)
-            .addOnCompleteListener(taskResult -> {
-                if (listener != null) {
-                    listener.onComplete(taskResult.isSuccessful(), taskResult.getException());
-                }
-            });
-    }
-    
-    public void updateTask(String taskId, Task task, OnCompleteListener listener) {
-        Map<String, Object> taskData = createTaskMap(task);
-        
-        db.collection("tasks")
-            .document(taskId)
-            .update(taskData)
-            .addOnCompleteListener(taskResult -> {
-                if (listener != null) {
-                    listener.onComplete(taskResult.isSuccessful(), taskResult.getException());
-                }
-            });
-    }
-    
-    // Category management
-    public void saveCategory(Category category, OnCompleteListener listener) {
-        Map<String, Object> categoryData = new HashMap<>();
-        categoryData.put("userId", category.getUserId());
-        categoryData.put("name", category.getName());
-        categoryData.put("color", category.getColor());
-        categoryData.put("createdAt", category.getCreatedAt());
-        
-        db.collection("categories")
-            .add(categoryData)
-            .addOnCompleteListener(task -> {
-                if (listener != null) {
-                    listener.onComplete(task.isSuccessful(), task.getException());
-                }
-            });
-    }
-    
-    // Helper methods
-    private Map<String, Object> createTaskMap(Task task) {
-        Map<String, Object> taskData = new HashMap<>();
-        taskData.put("userId", task.getUserId());
-        taskData.put("categoryId", task.getCategoryId());
-        taskData.put("name", task.getName());
-        taskData.put("description", task.getDescription());
-        taskData.put("difficulty", task.getDifficulty());
-        taskData.put("importance", task.getImportance());
-        taskData.put("xpValue", task.getXpValue());
-        taskData.put("isRecurring", task.isRecurring());
-        taskData.put("recurrenceInterval", task.getRecurrenceInterval());
-        taskData.put("recurrenceUnit", task.getRecurrenceUnit());
-        taskData.put("startDate", task.getStartDate());
-        taskData.put("endDate", task.getEndDate());
-        taskData.put("executionTime", task.getExecutionTime());
-        taskData.put("status", task.getStatus());
-        taskData.put("createdAt", task.getCreatedAt());
-        return taskData;
-    }
-    
     public void sendVerificationEmail(OnCompleteListener listener) {
         FirebaseUser user = mAuth.getCurrentUser();
         if (user != null) {
@@ -192,7 +124,6 @@ public class FirebaseManager {
         }
     }
     
-    // Callback interfaces
     public interface OnCompleteListener {
         void onComplete(boolean success, Exception exception);
     }

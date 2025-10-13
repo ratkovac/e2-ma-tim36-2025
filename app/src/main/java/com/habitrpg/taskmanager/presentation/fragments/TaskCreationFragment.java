@@ -14,7 +14,9 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.Navigation;
 
+import com.habitrpg.taskmanager.R;
 import com.habitrpg.taskmanager.data.database.entities.Category;
 import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.databinding.FragmentTaskCreationBinding;
@@ -47,9 +49,16 @@ public class TaskCreationFragment extends Fragment {
         taskService = TaskService.getInstance(requireContext());
         categoryService = CategoryService.getInstance(requireContext());
         
+        setupToolbar();
         setupSpinners();
         setupClickListeners();
         loadCategories();
+    }
+    
+    private void setupToolbar() {
+        binding.toolbar.setNavigationOnClickListener(v -> {
+            Navigation.findNavController(v).navigateUp();
+        });
     }
     
     private void setupSpinners() {
@@ -102,7 +111,9 @@ public class TaskCreationFragment extends Fragment {
             
             @Override
             public void onError(String error) {
-                Toast.makeText(getContext(), "Failed to load categories: " + error, Toast.LENGTH_SHORT).show();
+                requireActivity().runOnUiThread(() -> {
+                    Toast.makeText(getContext(), "Failed to load categories: " + error, Toast.LENGTH_SHORT).show();
+                });
             }
             
             @Override
@@ -115,7 +126,10 @@ public class TaskCreationFragment extends Fragment {
     
     private void setupCategorySpinner() {
         if (categories == null || categories.isEmpty()) {
-            Toast.makeText(getContext(), "No categories available. Please create categories first.", Toast.LENGTH_LONG).show();
+            Toast.makeText(getContext(), "Prvo napravite kategoriju u sekciji Categories!", Toast.LENGTH_LONG).show();
+            requireActivity().runOnUiThread(() -> {
+                Navigation.findNavController(requireView()).navigateUp();
+            });
             return;
         }
         
@@ -238,13 +252,22 @@ public class TaskCreationFragment extends Fragment {
         taskService.createTask(task, new TaskService.TaskCallback() {
             @Override
             public void onSuccess(String message) {
-                Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
-                clearForm();
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+                        // Navigate back to tasks fragment
+                        Navigation.findNavController(requireView()).navigateUp();
+                    });
+                }
             }
             
             @Override
             public void onError(String error) {
-                Toast.makeText(getContext(), "Failed to create task: " + error, Toast.LENGTH_SHORT).show();
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Failed to create task: " + error, Toast.LENGTH_SHORT).show();
+                    });
+                }
             }
             
             @Override

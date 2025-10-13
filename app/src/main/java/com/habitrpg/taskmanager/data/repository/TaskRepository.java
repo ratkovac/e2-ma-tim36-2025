@@ -4,7 +4,6 @@ import android.content.Context;
 import com.habitrpg.taskmanager.data.database.AppDatabase;
 import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.data.database.entities.TaskCompletion;
-import com.habitrpg.taskmanager.data.firebase.FirebaseManager;
 import com.habitrpg.taskmanager.data.preferences.UserPreferences;
 
 import java.text.SimpleDateFormat;
@@ -19,13 +18,11 @@ public class TaskRepository {
     
     private static TaskRepository instance;
     private AppDatabase database;
-    private FirebaseManager firebaseManager;
     private UserPreferences userPreferences;
     private ExecutorService executor;
     
     private TaskRepository(Context context) {
         database = AppDatabase.getDatabase(context);
-        firebaseManager = FirebaseManager.getInstance();
         userPreferences = UserPreferences.getInstance(context);
         executor = Executors.newFixedThreadPool(2);
     }
@@ -42,15 +39,7 @@ public class TaskRepository {
             try {
                 long taskId = database.taskDao().insertTask(task);
                 task.setId((int) taskId);
-                
-                firebaseManager.saveTask(task, (success, exception) -> {
-                    if (success) {
-                        callback.onSuccess("Task created successfully");
-                    } else {
-                        callback.onError("Failed to sync task to cloud: " + 
-                            (exception != null ? exception.getMessage() : "Unknown error"));
-                    }
-                });
+                callback.onSuccess("Task created successfully");
             } catch (Exception e) {
                 callback.onError("Failed to create task: " + e.getMessage());
             }
@@ -61,14 +50,7 @@ public class TaskRepository {
         executor.execute(() -> {
             try {
                 database.taskDao().updateTask(task);
-                
-                firebaseManager.updateTask(String.valueOf(task.getId()), task, (success, exception) -> {
-                    if (success) {
-                        callback.onSuccess("Task updated successfully");
-                    } else {
-                        callback.onError("Failed to sync task update to cloud");
-                    }
-                });
+                callback.onSuccess("Task updated successfully");
             } catch (Exception e) {
                 callback.onError("Failed to update task: " + e.getMessage());
             }

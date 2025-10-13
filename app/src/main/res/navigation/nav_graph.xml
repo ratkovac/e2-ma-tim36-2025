@@ -20,6 +20,16 @@
         android:label="Categories" />
 
     <fragment
+        android:id="@+id/navigation_statistics"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.StatisticsFragment"
+        android:label="Statistics" />
+
+    <fragment
+        android:id="@+id/navigation_level_progress"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.LevelProgressFragment"
+        android:label="Level Progress" />
+
+    <fragment
         android:id="@+id/navigation_task_creation"
         android:name="com.habitrpg.taskmanager.presentation.fragments.TaskCreationFragment"
         android:label="Create Task" />
