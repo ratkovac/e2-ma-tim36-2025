@@ -30,7 +30,7 @@ public class StatisticsService {
     
     private StatisticsService(Context context) {
         database = AppDatabase.getDatabase(context);
-        userStatisticsRepository = new UserStatisticsRepository(context);
+        userStatisticsRepository = UserStatisticsRepository.getInstance(context);
         userPreferences = UserPreferences.getInstance(context);
         executor = Executors.newFixedThreadPool(2);
     }

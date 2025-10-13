@@ -30,6 +30,16 @@
         android:label="Level Progress" />
 
     <fragment
+        android:id="@+id/navigation_friends"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.FriendsFragment"
+        android:label="Friends" />
+
+    <fragment
+        android:id="@+id/navigation_user_profile"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.UserProfileFragment"
+        android:label="User Profile" />
+
+    <fragment
         android:id="@+id/navigation_task_creation"
         android:name="com.habitrpg.taskmanager.presentation.fragments.TaskCreationFragment"
         android:label="Create Task" />

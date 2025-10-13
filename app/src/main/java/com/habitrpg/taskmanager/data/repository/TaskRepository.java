@@ -34,7 +34,15 @@ public class TaskRepository {
         return instance;
     }
     
+    private void ensureExecutorActive() {
+        if (executor.isShutdown()) {
+            executor = Executors.newFixedThreadPool(2);
+        }
+    }
+    
     public void insertTask(Task task, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 long taskId = database.taskDao().insertTask(task);
@@ -47,6 +55,8 @@ public class TaskRepository {
     }
     
     public void updateTask(Task task, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.taskDao().updateTask(task);
@@ -58,6 +68,8 @@ public class TaskRepository {
     }
     
     public void updateTaskStatus(int taskId, String status, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.taskDao().updateTaskStatus(taskId, status);
@@ -69,6 +81,8 @@ public class TaskRepository {
     }
     
     public void getTaskById(int taskId, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 Task task = database.taskDao().getTaskById(taskId);
@@ -80,6 +94,8 @@ public class TaskRepository {
     }
     
     public void getActiveTasksByUserId(String userId, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 List<Task> tasks = database.taskDao().getActiveTasksByUserId(userId);
@@ -91,6 +107,8 @@ public class TaskRepository {
     }
     
     public void getTasksByUserId(String userId, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 List<Task> tasks = database.taskDao().getActiveTasksByUserId(userId);
@@ -106,6 +124,8 @@ public class TaskRepository {
     }
     
     public void insertTaskCompletion(TaskCompletion completion, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.taskCompletionDao().insertTaskCompletion(completion);

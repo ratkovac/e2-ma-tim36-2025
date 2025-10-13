@@ -31,7 +31,15 @@ public class UserRepository {
         return instance;
     }
     
+    private void ensureExecutorActive() {
+        if (executor.isShutdown()) {
+            executor = Executors.newFixedThreadPool(2);
+        }
+    }
+    
     public void getUserById(String userId, UserCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 User user = database.userDao().getUserById(userId);
@@ -52,6 +60,8 @@ public class UserRepository {
     }
     
     public void insertUser(User user, UserCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.userDao().insertUser(user);
@@ -63,6 +73,8 @@ public class UserRepository {
     }
     
     public void updateUser(User user, UserCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.userDao().updateUser(user);
@@ -82,6 +94,8 @@ public class UserRepository {
     }
     
     public void loginUser(String userId, UserCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.userDao().logoutAllUsers();
@@ -94,6 +108,8 @@ public class UserRepository {
     }
     
     public void logoutAllUsers(UserCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.userDao().logoutAllUsers();
