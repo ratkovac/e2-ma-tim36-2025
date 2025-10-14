@@ -53,6 +53,7 @@ public class ProfileFragment extends Fragment {
         binding.btnViewBadges.setOnClickListener(v -> showBadges());
         binding.btnViewEquipment.setOnClickListener(v -> showEquipment());
         binding.btnLevelProgress.setOnClickListener(v -> showLevelProgress());
+        binding.btnStatistics.setOnClickListener(v -> showStatistics());
     }
 
     private void showChangePasswordDialog() {
@@ -96,6 +97,10 @@ public class ProfileFragment extends Fragment {
 
     private void showLevelProgress() {
         Navigation.findNavController(requireView()).navigate(R.id.navigation_level_progress);
+    }
+    
+    private void showStatistics() {
+        Navigation.findNavController(requireView()).navigate(R.id.navigation_statistics);
     }
 
     private void loadUserProfile() {

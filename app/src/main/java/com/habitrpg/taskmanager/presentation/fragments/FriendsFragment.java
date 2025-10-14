@@ -1,6 +1,7 @@
 package com.habitrpg.taskmanager.presentation.fragments;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -16,6 +17,8 @@ import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
 import com.habitrpg.taskmanager.R;
 import com.habitrpg.taskmanager.data.database.entities.Friend;
 import com.habitrpg.taskmanager.data.database.entities.FriendRequest;
@@ -192,8 +195,14 @@ public class FriendsFragment extends Fragment {
             return;
         }
         
-        // TODO: Implement QR scanner navigation
-        Toast.makeText(requireContext(), "QR Scanner not implemented yet", Toast.LENGTH_SHORT).show();
+        // Start QR code scanner
+        IntentIntegrator integrator = IntentIntegrator.forSupportFragment(this);
+        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE);
+        integrator.setPrompt("Scan QR code to add friend");
+        integrator.setCameraId(0);
+        integrator.setBeepEnabled(false);
+        integrator.setBarcodeImageEnabled(true);
+        integrator.initiateScan();
     }
     
     private void onFriendClick(Friend friend) {
@@ -271,6 +280,51 @@ public class FriendsFragment extends Fragment {
     public void refreshData() {
         android.util.Log.d("FriendsFragment", "refreshData() called");
         loadData();
+    }
+    
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (result != null) {
+            if (result.getContents() == null) {
+                Toast.makeText(requireContext(), "QR scan cancelled", Toast.LENGTH_SHORT).show();
+            } else {
+                // Process scanned QR code
+                String qrContent = result.getContents();
+                processQRCode(qrContent);
+            }
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
+    }
+    
+    private void processQRCode(String qrContent) {
+        try {
+            // QR code should contain user ID
+            friendService.addFriendByQRCode(qrContent, new FriendService.FriendCallback() {
+                @Override
+                public void onSuccess(String message) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                        refreshData(); // Refresh friends list
+                    });
+                }
+                
+                @Override
+                public void onError(String error) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), "Failed to add friend: " + error, Toast.LENGTH_SHORT).show();
+                    });
+                }
+                
+                @Override
+                public void onFriendsRetrieved(List<Friend> friends) {
+                    // Not used here
+                }
+            });
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Invalid QR code format", Toast.LENGTH_SHORT).show();
+        }
     }
     
     @Override

@@ -372,3 +372,4 @@ public class StatisticsFragment extends Fragment {
         binding = null;
     }
 }
+

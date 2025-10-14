@@ -13,11 +13,11 @@
         android:icon="@drawable/ic_categories"
         android:title="Categories" />
     <item
-        android:id="@+id/navigation_statistics"
-        android:icon="@drawable/ic_statistics"
-        android:title="Statistics" />
-    <item
         android:id="@+id/navigation_friends"
         android:icon="@android:drawable/ic_menu_myplaces"
         android:title="Friends" />
+    <item
+        android:id="@+id/navigation_guild"
+        android:icon="@drawable/ic_guild"
+        android:title="Guild" />
 </menu>
