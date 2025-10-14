@@ -12,3 +12,4 @@ Tag: TaskManager, Firebase, Auth, Task, Category
 
 # Exclude verbose logs
 Exclude: System.out, System.err, dalvikvm, art, libc, DEBUG
+

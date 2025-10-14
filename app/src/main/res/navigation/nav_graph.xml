@@ -40,6 +40,11 @@
         android:label="User Profile" />
 
     <fragment
+        android:id="@+id/navigation_guild"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.GuildFragment"
+        android:label="Guild" />
+
+    <fragment
         android:id="@+id/navigation_task_creation"
         android:name="com.habitrpg.taskmanager.presentation.fragments.TaskCreationFragment"
         android:label="Create Task" />

@@ -32,3 +32,4 @@ public class QRCodeGenerator {
         return String.format("TaskManager:%s:%s:%s", userId, username, email);
     }
 }
+
