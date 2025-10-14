@@ -4,7 +4,6 @@ import android.content.Context;
 import com.habitrpg.taskmanager.data.database.AppDatabase;
 import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.data.database.entities.TaskCompletion;
-import com.habitrpg.taskmanager.data.firebase.FirebaseManager;
 import com.habitrpg.taskmanager.data.preferences.UserPreferences;
 
 import java.text.SimpleDateFormat;
@@ -19,13 +18,11 @@ public class TaskRepository {
 
     private static TaskRepository instance;
     private AppDatabase database;
-    private FirebaseManager firebaseManager;
     private UserPreferences userPreferences;
     private ExecutorService executor;
 
     private TaskRepository(Context context) {
         database = AppDatabase.getDatabase(context);
-        firebaseManager = FirebaseManager.getInstance();
         userPreferences = UserPreferences.getInstance(context);
         executor = Executors.newFixedThreadPool(2);
     }
@@ -37,20 +34,20 @@ public class TaskRepository {
         return instance;
     }
 
+    private void ensureExecutorActive() {
+        if (executor.isShutdown()) {
+            executor = Executors.newFixedThreadPool(2);
+        }
+    }
+
     public void insertTask(Task task, TaskCallback callback) {
+        ensureExecutorActive();
+
         executor.execute(() -> {
             try {
                 long taskId = database.taskDao().insertTask(task);
                 task.setId((int) taskId);
-
-                firebaseManager.saveTask(task, (success, exception) -> {
-                    if (success) {
-                        callback.onSuccess("Task created successfully");
-                    } else {
-                        callback.onError("Failed to sync task to cloud: " +
-                                (exception != null ? exception.getMessage() : "Unknown error"));
-                    }
-                });
+                callback.onSuccess("Task created successfully");
             } catch (Exception e) {
                 callback.onError("Failed to create task: " + e.getMessage());
             }
@@ -58,17 +55,12 @@ public class TaskRepository {
     }
 
     public void updateTask(Task task, TaskCallback callback) {
+        ensureExecutorActive();
+
         executor.execute(() -> {
             try {
                 database.taskDao().updateTask(task);
-
-                firebaseManager.updateTask(String.valueOf(task.getId()), task, (success, exception) -> {
-                    if (success) {
-                        callback.onSuccess("Task updated successfully");
-                    } else {
-                        callback.onError("Failed to sync task update to cloud");
-                    }
-                });
+                callback.onSuccess("Task updated successfully");
             } catch (Exception e) {
                 callback.onError("Failed to update task: " + e.getMessage());
             }
@@ -76,6 +68,8 @@ public class TaskRepository {
     }
 
     public void updateTaskStatus(int taskId, String status, TaskCallback callback) {
+        ensureExecutorActive();
+
         executor.execute(() -> {
             try {
                 database.taskDao().updateTaskStatus(taskId, status);
@@ -87,6 +81,8 @@ public class TaskRepository {
     }
 
     public void getTaskById(int taskId, TaskCallback callback) {
+        ensureExecutorActive();
+
         executor.execute(() -> {
             try {
                 Task task = database.taskDao().getTaskById(taskId);
@@ -98,6 +94,8 @@ public class TaskRepository {
     }
 
     public void getActiveTasksByUserId(String userId, TaskCallback callback) {
+        ensureExecutorActive();
+
         executor.execute(() -> {
             try {
                 List<Task> tasks = database.taskDao().getActiveTasksByUserId(userId);
@@ -109,6 +107,8 @@ public class TaskRepository {
     }
 
     public void getTasksByUserId(String userId, TaskCallback callback) {
+        ensureExecutorActive();
+
         executor.execute(() -> {
             try {
                 List<Task> tasks = database.taskDao().getActiveTasksByUserId(userId);
@@ -124,6 +124,8 @@ public class TaskRepository {
     }
 
     public void insertTaskCompletion(TaskCompletion completion, TaskCallback callback) {
+        ensureExecutorActive();
+
         executor.execute(() -> {
             try {
                 database.taskCompletionDao().insertTaskCompletion(completion);
@@ -135,6 +137,8 @@ public class TaskRepository {
     }
 
     public void getTaskCountByDifficultyAndImportanceForDate(String userId, String difficulty, String importance, String date, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 int count = database.taskDao().getTaskCountByDifficultyAndImportanceForDate(userId, difficulty, importance, date);
@@ -146,6 +150,8 @@ public class TaskRepository {
     }
 
     public void getExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 int count = database.taskDao().getExtremeTaskCountForWeek(userId, weekStart, weekEnd);
@@ -157,6 +163,8 @@ public class TaskRepository {
     }
 
     public void getSpecialTaskCountForMonth(String userId, String monthStart, String monthEnd, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 int count = database.taskDao().getSpecialTaskCountForMonth(userId, monthStart, monthEnd);
@@ -166,8 +174,10 @@ public class TaskRepository {
             }
         });
     }
-    
+
     public void getTasksByDate(String userId, String date, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 List<Task> tasks = database.taskDao().getTasksByDate(userId, date);
@@ -177,8 +187,10 @@ public class TaskRepository {
             }
         });
     }
-    
+
     public void getTasksInDateRange(String userId, String startDate, String endDate, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 List<Task> tasks = database.taskDao().getTasksInDateRange(userId, startDate, endDate);
@@ -188,8 +200,10 @@ public class TaskRepository {
             }
         });
     }
-    
+
     public void deleteTask(int taskId, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.taskDao().deleteTaskById(taskId);
@@ -199,8 +213,10 @@ public class TaskRepository {
             }
         });
     }
-    
+
     public void deleteFutureRecurringInstances(String userId, String taskBaseName, String currentDate, TaskCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 String namePattern = taskBaseName + " (%)";

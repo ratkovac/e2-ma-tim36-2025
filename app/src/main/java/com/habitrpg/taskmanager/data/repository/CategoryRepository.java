@@ -29,7 +29,15 @@ public class CategoryRepository {
         return instance;
     }
     
+    private void ensureExecutorActive() {
+        if (executor.isShutdown()) {
+            executor = Executors.newFixedThreadPool(2);
+        }
+    }
+    
     public void insertCategory(Category category, CategoryCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.categoryDao().insertCategory(category);
@@ -41,6 +49,8 @@ public class CategoryRepository {
     }
     
     public void updateCategory(Category category, CategoryCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 database.categoryDao().updateCategory(category);
@@ -52,6 +62,8 @@ public class CategoryRepository {
     }
     
     public void deleteCategory(long categoryId, CategoryCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 Category category = database.categoryDao().getCategoryById((int) categoryId);
@@ -75,6 +87,8 @@ public class CategoryRepository {
     }
     
     public void getCategoryById(long categoryId, CategoryCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 Category category = database.categoryDao().getCategoryById((int) categoryId);
@@ -86,6 +100,8 @@ public class CategoryRepository {
     }
     
     public void getCategoriesByUserId(String userId, CategoryCallback callback) {
+        ensureExecutorActive();
+        
         executor.execute(() -> {
             try {
                 List<Category> categories = database.categoryDao().getCategoriesByUserId(userId);

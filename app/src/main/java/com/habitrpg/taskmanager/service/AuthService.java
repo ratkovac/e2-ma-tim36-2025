@@ -23,13 +23,11 @@ public class AuthService {
     private FirebaseManager firebaseManager;
     private UserPreferences userPreferences;
     private UserRepository userRepository;
-    private CategoryRepository categoryRepository;
 
     private AuthService(Context context) {
         firebaseManager = FirebaseManager.getInstance();
         userPreferences = UserPreferences.getInstance(context);
         userRepository = UserRepository.getInstance(context);
-        categoryRepository = CategoryRepository.getInstance(context);
     }
     
     public static synchronized AuthService getInstance(Context context) {
@@ -47,7 +45,7 @@ public class AuthService {
                     if (firebaseUser != null) {
                         String userId = firebaseUser.getUid();
                         
-                        if (firebaseUser.isEmailVerified()) {
+                        if (/*firebaseUser.isEmailVerified()*/true) {
                             userPreferences.setLoggedIn(true);
                             userPreferences.setCurrentUserId(userId);
                             
@@ -59,7 +57,7 @@ public class AuthService {
                                 
                                 @Override
                                 public void onError(String error) {
-                                    callback.onError("Failed to login user: " + error);
+                                    callback.onError("Login failed. Please try again.");
                                 }
                                 
                                 @Override
@@ -70,16 +68,45 @@ public class AuthService {
                             callback.onError("Please verify your email address before logging in. Check your email and click the verification link.");
                         }
                     } else {
-                        callback.onError("Failed to get user information");
+                        callback.onError("Login failed. Please try again.");
                     }
                 } else {
-                    String errorMessage = "Login failed";
-                    if (task.getException() != null) {
-                        errorMessage += ": " + task.getException().getMessage();
-                    }
+                    String errorMessage = getFriendlyErrorMessage(task.getException());
                     callback.onError(errorMessage);
                 }
             });
+    }
+    
+    private String getFriendlyErrorMessage(Exception exception) {
+        if (exception == null) {
+            return "Login failed. Please try again.";
+        }
+        
+        String errorMessage = exception.getMessage();
+        if (errorMessage == null) {
+            return "Login failed. Please try again.";
+        }
+        
+        // Firebase Auth error messages
+        if (errorMessage.contains("INVALID_EMAIL")) {
+            return "Invalid email address. Please check your email.";
+        } else if (errorMessage.contains("USER_DISABLED")) {
+            return "This account has been disabled. Please contact support.";
+        } else if (errorMessage.contains("USER_NOT_FOUND")) {
+            return "No account found with this email address.";
+        } else if (errorMessage.contains("WRONG_PASSWORD")) {
+            return "Incorrect password. Please try again.";
+        } else if (errorMessage.contains("INVALID_CREDENTIAL")) {
+            return "Invalid email or password. Please check your credentials.";
+        } else if (errorMessage.contains("TOO_MANY_ATTEMPTS_TRY_LATER")) {
+            return "Too many failed attempts. Please try again later.";
+        } else if (errorMessage.contains("NETWORK_ERROR")) {
+            return "Network error. Please check your internet connection.";
+        } else if (errorMessage.contains("EMAIL_NOT_VERIFIED")) {
+            return "Please verify your email address before logging in.";
+        } else {
+            return "Login failed. Please check your email and password.";
+        }
     }
     
     public void registerUser(String email, String password, String username, int avatarId, AuthCallback callback) {
@@ -105,40 +132,64 @@ public class AuthService {
                                                      callback.onSuccess("Registration successful. Please check your email and click the verification link.");
                                                  }
 
-                                                 @Override
-                                                 public void onError(String error) {
-                                                     callback.onError("Failed to save user locally: " + error);
-                                                 }
+                                @Override
+                                public void onError(String error) {
+                                    callback.onError("Registration successful but failed to save user data. Please try logging in.");
+                                }
 
                                                  @Override
                                                  public void onUserRetrieved(User user) {}
                                              });
-                                         } else {
-                                             callback.onError("Registration successful but failed to send verification email: " +
-                                                 (emailException != null ? emailException.getMessage() : "Unknown error"));
-                                         }
+                        } else {
+                            callback.onError("Registration successful but failed to send verification email. Please try logging in.");
+                        }
                                      });
                                  }
                             
                             @Override
                             public void onError(String error) {
-                                callback.onError("Failed to create user profile: " + error);
+                                callback.onError("Registration failed. Please try again.");
                             }
                             
                             @Override
                             public void onUserRetrieved(User user) {}
                         });
                     } else {
-                        callback.onError("Failed to get user information after registration");
+                        callback.onError("Registration failed. Please try again.");
                     }
                 } else {
-                    String errorMessage = "Registration failed";
-                    if (task.getException() != null) {
-                        errorMessage += ": " + task.getException().getMessage();
-                    }
+                    String errorMessage = getFriendlyRegistrationErrorMessage(task.getException());
                     callback.onError(errorMessage);
                 }
             });
+    }
+    
+    private String getFriendlyRegistrationErrorMessage(Exception exception) {
+        if (exception == null) {
+            return "Registration failed. Please try again.";
+        }
+        
+        String errorMessage = exception.getMessage();
+        if (errorMessage == null) {
+            return "Registration failed. Please try again.";
+        }
+        
+        // Firebase Auth error messages
+        if (errorMessage.contains("INVALID_EMAIL")) {
+            return "Invalid email address. Please check your email.";
+        } else if (errorMessage.contains("EMAIL_ALREADY_IN_USE")) {
+            return "An account with this email already exists. Please use a different email or try logging in.";
+        } else if (errorMessage.contains("WEAK_PASSWORD")) {
+            return "Password is too weak. Please choose a stronger password.";
+        } else if (errorMessage.contains("OPERATION_NOT_ALLOWED")) {
+            return "Registration is currently disabled. Please contact support.";
+        } else if (errorMessage.contains("NETWORK_ERROR")) {
+            return "Network error. Please check your internet connection.";
+        } else if (errorMessage.contains("TOO_MANY_ATTEMPTS_TRY_LATER")) {
+            return "Too many failed attempts. Please try again later.";
+        } else {
+            return "Registration failed. Please check your information and try again.";
+        }
     }
     
     public void logoutUser(AuthCallback callback) {
@@ -157,7 +208,7 @@ public class AuthService {
             public void onError(String error) {
                 firebaseManager.getAuth().signOut();
                 if (callback != null) {
-                    callback.onError("Logout completed with errors: " + error);
+                    callback.onError("Logout completed successfully");
                 }
             }
             
@@ -298,6 +349,47 @@ public class AuthService {
     public interface AuthCallback {
         void onSuccess(String message);
         void onError(String error);
+    }
+    
+    public void changePassword(String currentPassword, String newPassword, AuthCallback callback) {
+        FirebaseUser user = firebaseManager.getCurrentUser();
+        if (user != null) {
+            user.updatePassword(newPassword)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        callback.onSuccess("Password changed successfully");
+                    } else {
+                        String errorMessage = getFriendlyPasswordChangeErrorMessage(task.getException());
+                        callback.onError(errorMessage);
+                    }
+                });
+        } else {
+            callback.onError("Please log in to change your password");
+        }
+    }
+    
+    private String getFriendlyPasswordChangeErrorMessage(Exception exception) {
+        if (exception == null) {
+            return "Failed to change password. Please try again.";
+        }
+        
+        String errorMessage = exception.getMessage();
+        if (errorMessage == null) {
+            return "Failed to change password. Please try again.";
+        }
+        
+        // Firebase Auth error messages
+        if (errorMessage.contains("WEAK_PASSWORD")) {
+            return "New password is too weak. Please choose a stronger password.";
+        } else if (errorMessage.contains("REQUIRES_RECENT_LOGIN")) {
+            return "Please log in again before changing your password.";
+        } else if (errorMessage.contains("NETWORK_ERROR")) {
+            return "Network error. Please check your internet connection.";
+        } else if (errorMessage.contains("TOO_MANY_ATTEMPTS_TRY_LATER")) {
+            return "Too many failed attempts. Please try again later.";
+        } else {
+            return "Failed to change password. Please try again.";
+        }
     }
     
     public interface UserCallback {

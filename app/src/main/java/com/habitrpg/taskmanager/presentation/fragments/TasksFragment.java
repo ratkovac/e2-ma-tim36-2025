@@ -15,6 +15,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import com.google.android.material.tabs.TabLayout;
 import com.habitrpg.taskmanager.R;
 import com.habitrpg.taskmanager.presentation.adapters.CalendarTaskAdapter;
+import com.habitrpg.taskmanager.R;
+import com.habitrpg.taskmanager.presentation.adapters.TaskAdapter;
 import com.habitrpg.taskmanager.service.TaskService;
 import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.databinding.FragmentTasksBinding;
@@ -51,6 +53,7 @@ public class TasksFragment extends Fragment {
         filteredTasks = new ArrayList<>();
         
         setupUI();
+        setupClickListeners();
         loadTasks();
     }
     
@@ -83,7 +86,7 @@ public class TasksFragment extends Fragment {
             @Override
             public void onTabReselected(TabLayout.Tab tab) {}
         });
-        
+
         // Setup RecyclerView with CalendarTaskAdapter
         taskAdapter = new CalendarTaskAdapter(requireContext(), filteredTasks, new CalendarTaskAdapter.OnTaskClickListener() {
             @Override
@@ -102,11 +105,18 @@ public class TasksFragment extends Fragment {
         showLoading(true);
     }
     
+    private void setupClickListeners() {
+        binding.fabAddTask.setOnClickListener(v -> {
+            // Navigate to task creation fragment
+            Navigation.findNavController(v).navigate(R.id.navigation_task_creation);
+        });
+    }
+
     private void loadTasks() {
         taskService.getAllTasks(new TaskService.TaskCallback() {
             @Override
             public void onSuccess(String message) {}
-            
+
             @Override
             public void onError(String error) {
                 if (getActivity() != null) {
@@ -117,7 +127,7 @@ public class TasksFragment extends Fragment {
                     });
                 }
             }
-            
+
             @Override
             public void onTasksRetrieved(List<Task> tasks) {
                 if (getActivity() != null) {
@@ -135,11 +145,11 @@ public class TasksFragment extends Fragment {
                                 // Always include recurring templates
                                 if (task.isRecurring()) {
                                     allTasks.add(task);
-                                } 
+                                }
                                 // Include task instances if they are current/future or active/paused
-                                else if (task.getStartDate() != null && 
-                                    (task.getStartDate().compareTo(currentDate) >= 0 || 
-                                     "active".equals(task.getStatus()) || 
+                                else if (task.getStartDate() != null &&
+                                    (task.getStartDate().compareTo(currentDate) >= 0 ||
+                                     "active".equals(task.getStatus()) ||
                                      "paused".equals(task.getStatus()))) {
                                     allTasks.add(task);
                                 }
@@ -151,10 +161,10 @@ public class TasksFragment extends Fragment {
             }
         });
     }
-    
+
     private void filterTasks() {
         filteredTasks.clear();
-        
+
         switch (currentFilter) {
             case "all":
                 filteredTasks.addAll(allTasks);
@@ -172,7 +182,7 @@ public class TasksFragment extends Fragment {
                         .collect(Collectors.toList()));
                 break;
         }
-        
+
         if (filteredTasks.isEmpty()) {
             showEmptyState(true);
         } else {
@@ -185,7 +195,7 @@ public class TasksFragment extends Fragment {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         return sdf.format(new Date());
     }
-    
+
     
     private void showLoading(boolean show) {
         binding.progressBar.setVisibility(show ? View.VISIBLE : View.GONE);

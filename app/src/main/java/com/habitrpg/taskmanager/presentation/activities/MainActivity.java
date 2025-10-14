@@ -38,7 +38,6 @@ public class MainActivity extends AppCompatActivity {
         // Delay navigation setup to ensure fragment is ready
         binding.getRoot().post(() -> {
             setupNavigation();
-            setupClickListeners();
         });
     }
     
@@ -74,14 +73,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
     
-    private void setupClickListeners() {
-        binding.fabAddTask.setOnClickListener(v -> {
-            // Navigate to task creation fragment
-            if (navController != null) {
-                navController.navigate(R.id.navigation_task_creation);
-            }
-        });
-    }
     
     private void navigateToLogin() {
         Intent intent = new Intent(this, AuthActivity.class);
