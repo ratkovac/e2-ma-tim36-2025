@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/navigation_tasks"
+        android:icon="@drawable/ic_tasks"
+        android:title="Tasks" />
+    <item
+        android:id="@+id/navigation_profile"
+        android:icon="@drawable/ic_profile"
+        android:title="Profile" />
+    <item
+        android:id="@+id/navigation_categories"
+        android:icon="@drawable/ic_categories"
+        android:title="Categories" />
+    <item
+        android:id="@+id/navigation_friends"
+        android:icon="@android:drawable/ic_menu_myplaces"
+        android:title="Friends" />
+    <item
+        android:id="@+id/navigation_guild"
+        android:icon="@drawable/ic_guild"
+        android:title="Guild" />
+</menu>

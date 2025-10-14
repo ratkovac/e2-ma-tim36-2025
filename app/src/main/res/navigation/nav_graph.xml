@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/navigation_tasks">
+
+    <fragment
+        android:id="@+id/navigation_tasks"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.TasksFragment"
+        android:label="Tasks" />
+
+    <fragment
+        android:id="@+id/navigation_profile"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.ProfileFragment"
+        android:label="Profile" />
+
+    <fragment
+        android:id="@+id/navigation_categories"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.CategoriesFragment"
+        android:label="Categories" />
+
+    <fragment
+        android:id="@+id/navigation_statistics"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.StatisticsFragment"
+        android:label="Statistics" />
+
+    <fragment
+        android:id="@+id/navigation_level_progress"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.LevelProgressFragment"
+        android:label="Level Progress" />
+
+    <fragment
+        android:id="@+id/navigation_friends"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.FriendsFragment"
+        android:label="Friends" />
+
+    <fragment
+        android:id="@+id/navigation_user_profile"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.UserProfileFragment"
+        android:label="User Profile" />
+
+    <fragment
+        android:id="@+id/navigation_guild"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.GuildFragment"
+        android:label="Guild" />
+
+    <fragment
+        android:id="@+id/navigation_task_creation"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.TaskCreationFragment"
+        android:label="Create Task" />
+
+</navigation>

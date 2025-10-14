@@ -1,0 +1,146 @@
+package com.habitrpg.taskmanager.data.repository;
+
+import android.content.Context;
+import com.habitrpg.taskmanager.data.database.AppDatabase;
+import com.habitrpg.taskmanager.data.database.entities.Task;
+import com.habitrpg.taskmanager.data.database.entities.TaskCompletion;
+import com.habitrpg.taskmanager.data.preferences.UserPreferences;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class TaskRepository {
+    
+    private static TaskRepository instance;
+    private AppDatabase database;
+    private UserPreferences userPreferences;
+    private ExecutorService executor;
+    
+    private TaskRepository(Context context) {
+        database = AppDatabase.getDatabase(context);
+        userPreferences = UserPreferences.getInstance(context);
+        executor = Executors.newFixedThreadPool(2);
+    }
+    
+    public static synchronized TaskRepository getInstance(Context context) {
+        if (instance == null) {
+            instance = new TaskRepository(context.getApplicationContext());
+        }
+        return instance;
+    }
+    
+    private void ensureExecutorActive() {
+        if (executor.isShutdown()) {
+            executor = Executors.newFixedThreadPool(2);
+        }
+    }
+    
+    public void insertTask(Task task, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                long taskId = database.taskDao().insertTask(task);
+                task.setId((int) taskId);
+                callback.onSuccess("Task created successfully");
+            } catch (Exception e) {
+                callback.onError("Failed to create task: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void updateTask(Task task, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                database.taskDao().updateTask(task);
+                callback.onSuccess("Task updated successfully");
+            } catch (Exception e) {
+                callback.onError("Failed to update task: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void updateTaskStatus(int taskId, String status, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                database.taskDao().updateTaskStatus(taskId, status);
+                callback.onSuccess("Task status updated successfully");
+            } catch (Exception e) {
+                callback.onError("Failed to update task status: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void getTaskById(int taskId, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                Task task = database.taskDao().getTaskById(taskId);
+                callback.onTaskRetrieved(task);
+            } catch (Exception e) {
+                callback.onError("Failed to get task: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void getActiveTasksByUserId(String userId, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                List<Task> tasks = database.taskDao().getActiveTasksByUserId(userId);
+                callback.onTasksRetrieved(tasks);
+            } catch (Exception e) {
+                callback.onError("Failed to get active tasks: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void getTasksByUserId(String userId, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                List<Task> tasks = database.taskDao().getActiveTasksByUserId(userId);
+                callback.onTasksRetrieved(tasks);
+            } catch (Exception e) {
+                callback.onError("Failed to get tasks by user: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void getAllTasks(String userId, TaskCallback callback) {
+        getTasksByUserId(userId, callback);
+    }
+    
+    public void insertTaskCompletion(TaskCompletion completion, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                database.taskCompletionDao().insertTaskCompletion(completion);
+                callback.onSuccess("Task completion recorded successfully");
+            } catch (Exception e) {
+                callback.onError("Failed to record task completion: " + e.getMessage());
+            }
+        });
+    }
+    
+    public interface TaskCallback {
+        void onSuccess(String message);
+        void onError(String error);
+        void onTaskRetrieved(Task task);
+        void onTasksRetrieved(List<Task> tasks);
+        void onTaskCountRetrieved(int count);
+    }
+}

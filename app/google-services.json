@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "385809759265",
+    "project_id": "task-manager-5fe19",
+    "storage_bucket": "task-manager-5fe19.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:385809759265:android:d7a66f2e6e04c4c4abb760",
+        "android_client_info": {
+          "package_name": "com.habitrpg.taskmanager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJbQL1qKkSKbLZYiZDaOEwb8tl228YMQ8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

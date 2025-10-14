@@ -1,0 +1,15 @@
+# Logcat Filter Configuration
+# Add this to your Android Studio Logcat filters
+
+# Filter for your app only
+Package: com.habitrpg.taskmanager
+
+# Filter for errors and warnings only
+Level: Error, Warning
+
+# Filter for specific tags
+Tag: TaskManager, Firebase, Auth, Task, Category
+
+# Exclude verbose logs
+Exclude: System.out, System.err, dalvikvm, art, libc, DEBUG
+
