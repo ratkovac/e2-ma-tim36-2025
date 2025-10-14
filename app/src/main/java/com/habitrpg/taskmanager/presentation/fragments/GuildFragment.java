@@ -130,14 +130,18 @@ public class GuildFragment extends Fragment {
             
             @Override
             public void onError(String error) {
-                requireActivity().runOnUiThread(() -> {
-                    currentGuild = null;
-                    updateGuildUI();
-                    // Show toast if user is not in any guild
-                    if (error.contains("not in any guild")) {
-                        Toast.makeText(requireContext(), "You are not in any guild. Create one or wait for an invitation.", Toast.LENGTH_LONG).show();
-                    }
-                });
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (isAdded() && getContext() != null) {
+                            currentGuild = null;
+                            updateGuildUI();
+                            // Show toast if user is not in any guild
+                            if (error.contains("not in any guild")) {
+                                Toast.makeText(getContext(), "You are not in any guild. Create one or wait for an invitation.", Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    });
+                }
             }
         });
     }
@@ -145,30 +149,42 @@ public class GuildFragment extends Fragment {
     private void loadGuildMembers() {
         if (currentGuild == null) {
             // Clear members list when no guild
-            requireActivity().runOnUiThread(() -> {
-                guildMembers.clear();
-                memberAdapter.notifyDataSetChanged();
-                updateMemberCount();
-            });
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    if (isAdded() && getContext() != null) {
+                        guildMembers.clear();
+                        memberAdapter.notifyDataSetChanged();
+                        updateMemberCount();
+                    }
+                });
+            }
             return;
         }
         
         guildService.getGuildMembers(currentGuild.getGuildId(), new GuildService.GuildMemberListCallback() {
             @Override
             public void onSuccess(String message, List<GuildMember> members) {
-                requireActivity().runOnUiThread(() -> {
-                    guildMembers.clear();
-                    guildMembers.addAll(members);
-                    memberAdapter.notifyDataSetChanged();
-                    updateMemberCount();
-                });
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (isAdded() && getContext() != null) {
+                            guildMembers.clear();
+                            guildMembers.addAll(members);
+                            memberAdapter.notifyDataSetChanged();
+                            updateMemberCount();
+                        }
+                    });
+                }
             }
             
             @Override
             public void onError(String error) {
-                requireActivity().runOnUiThread(() -> {
-                    Toast.makeText(requireContext(), "Failed to load members: " + error, Toast.LENGTH_SHORT).show();
-                });
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (isAdded() && getContext() != null) {
+                            Toast.makeText(getContext(), "Failed to load members: " + error, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
             }
         });
     }
@@ -275,27 +291,36 @@ public class GuildFragment extends Fragment {
     
     private void leaveGuild() {
         if (currentGuild == null) {
-            Toast.makeText(requireContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+            if (isAdded() && getContext() != null) {
+                Toast.makeText(getContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+            }
             return;
         }
         
         guildService.leaveGuild(new GuildService.GuildCallback() {
             @Override
             public void onSuccess(String message, Guild guild) {
-                requireActivity().runOnUiThread(() -> {
-                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
-                    loadData(); // Refresh data
-                    
-                    // Navigate back to previous fragment
-                    Navigation.findNavController(requireView()).popBackStack();
-                });
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (isAdded() && getContext() != null) {
+                            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+                            
+                            // Navigate back to previous fragment
+                            Navigation.findNavController(requireView()).popBackStack();
+                        }
+                    });
+                }
             }
             
             @Override
             public void onError(String error) {
-                requireActivity().runOnUiThread(() -> {
-                    Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show();
-                });
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (isAdded() && getContext() != null) {
+                            Toast.makeText(getContext(), error, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
             }
         });
     }
