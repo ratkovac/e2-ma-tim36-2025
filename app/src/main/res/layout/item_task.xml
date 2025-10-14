@@ -22,14 +22,33 @@
             android:layout_marginBottom="8dp">
 
             <!-- Task Name -->
-            <TextView
-                android:id="@+id/tvTaskName"
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="@android:color/black" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tvTaskName"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@android:color/black" />
+
+                <!-- Recurring Indicator -->
+                <TextView
+                    android:id="@+id/tvRecurringIndicator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="🔄"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
 
             <!-- Status -->
             <TextView
@@ -42,6 +61,47 @@
                 android:padding="4dp"
                 android:background="@drawable/status_background"
                 android:textColor="@android:color/white" />
+
+        </LinearLayout>
+
+        <!-- Category and Date Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <!-- Category with Color Indicator -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <View
+                    android:id="@+id/categoryColorIndicator"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/circle_background" />
+
+                <TextView
+                    android:id="@+id/tvTaskCategory"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:textColor="@android:color/darker_gray" />
+
+            </LinearLayout>
+
+            <!-- Date -->
+            <TextView
+                android:id="@+id/tvTaskDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textColor="@android:color/darker_gray" />
 
         </LinearLayout>
 
@@ -70,9 +130,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:textSize="12sp"
-                android:textColor="@android:color/darker_gray"
-                android:drawableStart="@android:drawable/ic_menu_sort_by_size"
-                android:drawablePadding="4dp" />
+                android:textColor="@android:color/darker_gray" />
 
             <!-- Importance -->
             <TextView
@@ -81,9 +139,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:textSize="12sp"
-                android:textColor="@android:color/darker_gray"
-                android:drawableStart="@android:drawable/ic_menu_edit"
-                android:drawablePadding="4dp" />
+                android:textColor="@android:color/darker_gray" />
 
             <!-- XP Value -->
             <TextView
@@ -92,9 +148,7 @@
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:textColor="#4CAF50"
-                android:drawableStart="@android:drawable/ic_menu_add"
-                android:drawablePadding="4dp" />
+                android:textColor="#4CAF50" />
 
         </LinearLayout>
 
@@ -105,9 +159,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:textSize="12sp"
-            android:textColor="@android:color/darker_gray"
-            android:drawableStart="@android:drawable/ic_menu_edit"
-            android:drawablePadding="4dp" />
+            android:textColor="@android:color/darker_gray" />
 
         <!-- Action Buttons -->
         <LinearLayout
@@ -117,36 +169,42 @@
             android:gravity="end">
 
             <!-- Complete Button -->
-            <ImageView
+            <TextView
                 android:id="@+id/btnComplete"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
-                android:src="@android:drawable/ic_menu_edit"
                 android:background="@drawable/button_background"
-                android:padding="6dp"
-                android:contentDescription="Complete task" />
+                android:padding="8dp"
+                android:text="✓"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold" />
 
             <!-- Edit Button -->
-            <ImageView
+            <TextView
                 android:id="@+id/btnEdit"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
-                android:src="@android:drawable/ic_menu_edit"
                 android:background="@drawable/button_background"
-                android:padding="6dp"
-                android:contentDescription="Edit task" />
+                android:padding="8dp"
+                android:text="✏"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold" />
 
             <!-- Delete Button -->
-            <ImageView
+            <TextView
                 android:id="@+id/btnDelete"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:src="@android:drawable/ic_menu_delete"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:background="@drawable/button_background"
-                android:padding="6dp"
-                android:contentDescription="Delete task" />
+                android:padding="8dp"
+                android:text="✗"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold" />
 
         </LinearLayout>
 

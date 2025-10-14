@@ -24,4 +24,14 @@
         android:name="com.habitrpg.taskmanager.presentation.fragments.TaskCreationFragment"
         android:label="Create Task" />
 
+    <fragment
+        android:id="@+id/navigation_task_detail"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.TaskDetailFragment"
+        android:label="Task Details" />
+
+    <fragment
+        android:id="@+id/navigation_calendar"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.CalendarFragment"
+        android:label="Calendar" />
+
 </navigation>

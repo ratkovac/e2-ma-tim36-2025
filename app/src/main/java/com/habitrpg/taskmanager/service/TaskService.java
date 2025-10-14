@@ -42,6 +42,10 @@ public class TaskService {
         }
         
         task.setUserId(userId);
+        // Ensure start_date is set for single tasks to today if not provided
+        if (!task.isRecurring() && (task.getStartDate() == null || task.getStartDate().isEmpty())) {
+            task.setStartDate(DateUtils.getCurrentDateString());
+        }
         
         validateTaskQuota(task, isValid -> {
             if (!isValid) {
@@ -85,9 +89,39 @@ public class TaskService {
     
     private void createRecurringTasks(Task task, TaskCallback callback) {
         try {
+            // First, save the recurring task template
+            taskRepository.insertTask(task, new TaskRepository.TaskCallback() {
+                @Override
+                public void onSuccess(String message) {
+                    // Now create individual instances
+                    createRecurringInstances(task, callback);
+                }
+                
+                @Override
+                public void onError(String error) {
+                    callback.onError("Failed to save recurring task template: " + error);
+                }
+                
+                @Override
+                public void onTaskRetrieved(Task task) {}
+                
+                @Override
+                public void onTasksRetrieved(List<Task> tasks) {}
+                
+                @Override
+                public void onTaskCountRetrieved(int count) {}
+            });
+            
+        } catch (Exception e) {
+            callback.onError("Failed to create recurring tasks: " + e.getMessage());
+        }
+    }
+    
+    private void createRecurringInstances(Task templateTask, TaskCallback callback) {
+        try {
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
-            java.util.Date startDate = sdf.parse(task.getStartDate());
-            java.util.Date endDate = sdf.parse(task.getEndDate());
+            java.util.Date startDate = sdf.parse(templateTask.getStartDate());
+            java.util.Date endDate = sdf.parse(templateTask.getEndDate());
             
             java.util.Calendar cal = java.util.Calendar.getInstance();
             cal.setTime(startDate);
@@ -95,19 +129,20 @@ public class TaskService {
             int taskCount = 0;
             while (cal.getTime().before(endDate) || cal.getTime().equals(endDate)) {
                 Task recurringTask = new Task();
-                recurringTask.setUserId(task.getUserId());
-                recurringTask.setCategoryId(task.getCategoryId());
-                recurringTask.setName(task.getName());
-                recurringTask.setDescription(task.getDescription());
-                recurringTask.setDifficulty(task.getDifficulty());
-                recurringTask.setImportance(task.getImportance());
-                recurringTask.setXpValue(task.getXpValue());
-                recurringTask.setExecutionTime(task.getExecutionTime());
-                recurringTask.setRecurring(false);
+                recurringTask.setUserId(templateTask.getUserId());
+                recurringTask.setCategoryId(templateTask.getCategoryId());
+                recurringTask.setName(templateTask.getName());
+                recurringTask.setDescription(templateTask.getDescription());
+                recurringTask.setDifficulty(templateTask.getDifficulty());
+                recurringTask.setImportance(templateTask.getImportance());
+                recurringTask.setXpValue(templateTask.getXpValue());
+                recurringTask.setExecutionTime(templateTask.getExecutionTime());
+                recurringTask.setRecurring(false); // Instance is not recurring
                 recurringTask.setCreatedAt(System.currentTimeMillis());
+                recurringTask.setStartDate(sdf.format(cal.getTime()));
                 
                 String taskDate = sdf.format(cal.getTime());
-                recurringTask.setName(task.getName() + " (" + taskDate + ")");
+                recurringTask.setName(templateTask.getName() + " (" + taskDate + ")");
                 
                 taskRepository.insertTask(recurringTask, new TaskRepository.TaskCallback() {
                     @Override
@@ -128,17 +163,17 @@ public class TaskService {
                 
                 taskCount++;
                 
-                if ("day".equals(task.getRecurrenceUnit())) {
-                    cal.add(java.util.Calendar.DAY_OF_MONTH, task.getRecurrenceInterval());
-                } else if ("week".equals(task.getRecurrenceUnit())) {
-                    cal.add(java.util.Calendar.WEEK_OF_YEAR, task.getRecurrenceInterval());
+                if ("day".equals(templateTask.getRecurrenceUnit())) {
+                    cal.add(java.util.Calendar.DAY_OF_MONTH, templateTask.getRecurrenceInterval());
+                } else if ("week".equals(templateTask.getRecurrenceUnit())) {
+                    cal.add(java.util.Calendar.WEEK_OF_YEAR, templateTask.getRecurrenceInterval());
                 }
             }
             
-            callback.onSuccess("Recurring task created successfully! Generated " + taskCount + " tasks.");
+            callback.onSuccess("Recurring task created successfully! Generated " + taskCount + " instances.");
             
         } catch (Exception e) {
-            callback.onError("Failed to create recurring tasks: " + e.getMessage());
+            callback.onError("Failed to create recurring task instances: " + e.getMessage());
         }
     }
     
@@ -410,6 +445,105 @@ public class TaskService {
         });
     }
     
+    public void getTaskById(int taskId, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        taskRepository.getTaskById(taskId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {
+                if (task == null) {
+                    callback.onError("Task not found");
+                    return;
+                }
+                
+                if (!task.getUserId().equals(userId)) {
+                    callback.onError("Unauthorized to view this task");
+                    return;
+                }
+                
+                List<Task> tasks = new java.util.ArrayList<>();
+                tasks.add(task);
+                callback.onTasksRetrieved(tasks);
+            }
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    public void updateTaskStatus(int taskId, String status, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        taskRepository.getTaskById(taskId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {
+                if (task == null) {
+                    callback.onError("Task not found");
+                    return;
+                }
+                
+                if (!task.getUserId().equals(userId)) {
+                    callback.onError("Unauthorized to update this task");
+                    return;
+                }
+                
+                taskRepository.updateTaskStatus(taskId, status, new TaskRepository.TaskCallback() {
+                    @Override
+                    public void onSuccess(String message) {
+                        callback.onSuccess("Task status updated successfully");
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        callback.onError("Failed to update task status: " + error);
+                    }
+                    
+                    @Override
+                    public void onTaskRetrieved(Task task) {}
+                    
+                    @Override
+                    public void onTasksRetrieved(List<Task> tasks) {}
+                    
+                    @Override
+                    public void onTaskCountRetrieved(int count) {}
+                });
+            }
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
     public void getTasksByCategory(long categoryId, TaskCallback callback) {
         String userId = userPreferences.getCurrentUserId();
         if (userId == null) {
@@ -472,7 +606,7 @@ public class TaskService {
     }
     
     public void getTaskCountByDifficultyAndImportanceForDate(String userId, String difficulty, String importance, String date, TaskCountCallback callback) {
-        taskRepository.getTasksByUserId(userId, new TaskRepository.TaskCallback() {
+        taskRepository.getTaskCountByDifficultyAndImportanceForDate(userId, difficulty, importance, date, new TaskRepository.TaskCallback() {
             @Override
             public void onSuccess(String message) {}
             
@@ -485,22 +619,17 @@ public class TaskService {
             public void onTaskRetrieved(Task task) {}
             
             @Override
-            public void onTasksRetrieved(List<Task> tasks) {
-                long count = tasks.stream()
-                    .filter(task -> difficulty.equals(task.getDifficulty()) && 
-                                   importance.equals(task.getImportance()) && 
-                                   date.equals(task.getCreatedAt()))
-                    .count();
-                callback.onTaskCountRetrieved((int) count);
-            }
+            public void onTasksRetrieved(List<Task> tasks) {}
             
             @Override
-            public void onTaskCountRetrieved(int count) {}
+            public void onTaskCountRetrieved(int count) {
+                callback.onTaskCountRetrieved(count);
+            }
         });
     }
     
     public void getExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd, TaskCountCallback callback) {
-        taskRepository.getTasksByUserId(userId, new TaskRepository.TaskCallback() {
+        taskRepository.getExtremeTaskCountForWeek(userId, weekStart, weekEnd, new TaskRepository.TaskCallback() {
             @Override
             public void onSuccess(String message) {}
             
@@ -513,21 +642,17 @@ public class TaskService {
             public void onTaskRetrieved(Task task) {}
             
             @Override
-            public void onTasksRetrieved(List<Task> tasks) {
-                long count = tasks.stream()
-                    .filter(task -> "extreme".equals(task.getDifficulty()) && 
-                                   DateUtils.isDateInRange(task.getCreatedAt(), weekStart, weekEnd))
-                    .count();
-                callback.onTaskCountRetrieved((int) count);
-            }
+            public void onTasksRetrieved(List<Task> tasks) {}
             
             @Override
-            public void onTaskCountRetrieved(int count) {}
+            public void onTaskCountRetrieved(int count) {
+                callback.onTaskCountRetrieved(count);
+            }
         });
     }
     
     public void getSpecialTaskCountForMonth(String userId, String monthStart, String monthEnd, TaskCountCallback callback) {
-        taskRepository.getTasksByUserId(userId, new TaskRepository.TaskCallback() {
+        taskRepository.getSpecialTaskCountForMonth(userId, monthStart, monthEnd, new TaskRepository.TaskCallback() {
             @Override
             public void onSuccess(String message) {}
             
@@ -540,16 +665,12 @@ public class TaskService {
             public void onTaskRetrieved(Task task) {}
             
             @Override
-            public void onTasksRetrieved(List<Task> tasks) {
-                long count = tasks.stream()
-                    .filter(task -> "special".equals(task.getImportance()) && 
-                                   DateUtils.isDateInRange(task.getCreatedAt(), monthStart, monthEnd))
-                    .count();
-                callback.onTaskCountRetrieved((int) count);
-            }
+            public void onTasksRetrieved(List<Task> tasks) {}
             
             @Override
-            public void onTaskCountRetrieved(int count) {}
+            public void onTaskCountRetrieved(int count) {
+                callback.onTaskCountRetrieved(count);
+            }
         });
     }
     
@@ -643,6 +764,179 @@ public class TaskService {
         } else {
             callback.onValidationResult(true);
         }
+    }
+    
+    public void getTasksByDate(String date, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        taskRepository.getTasksByDate(userId, date, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {
+                callback.onTasksRetrieved(tasks);
+            }
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    public void getTasksInDateRange(String startDate, String endDate, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        taskRepository.getTasksInDateRange(userId, startDate, endDate, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {
+                callback.onTasksRetrieved(tasks);
+            }
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    public void deleteTask(int taskId, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        // First get task to check status and if it's recurring
+        taskRepository.getTaskById(taskId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {
+                if (task == null) {
+                    callback.onError("Task not found");
+                    return;
+                }
+                
+                if (!task.getUserId().equals(userId)) {
+                    callback.onError("Unauthorized to delete this task");
+                    return;
+                }
+                
+                // Ne može se obrisati završen zadatak
+                if ("completed".equals(task.getStatus())) {
+                    callback.onError("Cannot delete completed tasks");
+                    return;
+                }
+                
+                // Ako je ponavljajući template zadatak
+                if (task.isRecurring()) {
+                    // Briši template i sve buduće instance
+                    String taskBaseName = task.getName();
+                    String currentDate = DateUtils.getCurrentDateString();
+                    
+                    // Prvo obriši template
+                    taskRepository.deleteTask(taskId, new TaskRepository.TaskCallback() {
+                        @Override
+                        public void onSuccess(String message) {
+                            // Zatim obriši sve buduće instance
+                            taskRepository.deleteFutureRecurringInstances(userId, taskBaseName, currentDate, new TaskRepository.TaskCallback() {
+                                @Override
+                                public void onSuccess(String msg) {
+                                    callback.onSuccess("Recurring task and all future instances deleted");
+                                }
+                                
+                                @Override
+                                public void onError(String error) {
+                                    callback.onError(error);
+                                }
+                                
+                                @Override
+                                public void onTaskRetrieved(Task task) {}
+                                
+                                @Override
+                                public void onTasksRetrieved(List<Task> tasks) {}
+                                
+                                @Override
+                                public void onTaskCountRetrieved(int count) {}
+                            });
+                        }
+                        
+                        @Override
+                        public void onError(String error) {
+                            callback.onError(error);
+                        }
+                        
+                        @Override
+                        public void onTaskRetrieved(Task task) {}
+                        
+                        @Override
+                        public void onTasksRetrieved(List<Task> tasks) {}
+                        
+                        @Override
+                        public void onTaskCountRetrieved(int count) {}
+                    });
+                } else {
+                    // Obični zadatak ili instanca - samo obriši
+                    taskRepository.deleteTask(taskId, new TaskRepository.TaskCallback() {
+                        @Override
+                        public void onSuccess(String message) {
+                            callback.onSuccess("Task deleted successfully");
+                        }
+                        
+                        @Override
+                        public void onError(String error) {
+                            callback.onError(error);
+                        }
+                        
+                        @Override
+                        public void onTaskRetrieved(Task task) {}
+                        
+                        @Override
+                        public void onTasksRetrieved(List<Task> tasks) {}
+                        
+                        @Override
+                        public void onTaskCountRetrieved(int count) {}
+                    });
+                }
+            }
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
     }
     
     public String getCurrentUserId() {

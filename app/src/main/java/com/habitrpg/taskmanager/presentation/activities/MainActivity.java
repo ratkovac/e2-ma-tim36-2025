@@ -60,11 +60,14 @@ public class MainActivity extends AppCompatActivity {
             if (itemId == R.id.navigation_tasks) {
                 // Navigate to tasks
                 return true;
-            } else if (itemId == R.id.navigation_profile) {
-                // Navigate to profile
+            } else if (itemId == R.id.navigation_calendar) {
+                // Navigate to calendar
                 return true;
             } else if (itemId == R.id.navigation_categories) {
                 // Navigate to categories
+                return true;
+            } else if (itemId == R.id.navigation_profile) {
+                // Navigate to profile
                 return true;
             }
             return false;

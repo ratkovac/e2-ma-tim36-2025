@@ -5,11 +5,15 @@
         android:icon="@drawable/ic_tasks"
         android:title="Tasks" />
     <item
-        android:id="@+id/navigation_profile"
-        android:icon="@drawable/ic_profile"
-        android:title="Profile" />
+        android:id="@+id/navigation_calendar"
+        android:icon="@drawable/ic_calendar"
+        android:title="Calendar" />
     <item
         android:id="@+id/navigation_categories"
         android:icon="@drawable/ic_categories"
         android:title="Categories" />
+    <item
+        android:id="@+id/navigation_profile"
+        android:icon="@drawable/ic_profile"
+        android:title="Profile" />
 </menu>

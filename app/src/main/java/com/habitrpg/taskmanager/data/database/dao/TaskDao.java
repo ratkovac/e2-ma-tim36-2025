@@ -50,4 +50,19 @@ public interface TaskDao {
     
     @Query("DELETE FROM tasks WHERE user_id = :userId")
     void deleteAllTasksForUser(String userId);
+
+    @Query("SELECT COUNT(*) FROM tasks WHERE category_id = :categoryId AND status = 'active'")
+    int getActiveTaskCountForCategory(int categoryId);
+    
+    @Query("SELECT * FROM tasks WHERE user_id = :userId AND start_date = :date ORDER BY execution_time ASC")
+    List<Task> getTasksByDate(String userId, String date);
+    
+    @Query("SELECT * FROM tasks WHERE user_id = :userId AND start_date >= :startDate AND start_date <= :endDate ORDER BY start_date ASC, execution_time ASC")
+    List<Task> getTasksInDateRange(String userId, String startDate, String endDate);
+    
+    @Query("DELETE FROM tasks WHERE id = :taskId")
+    void deleteTaskById(int taskId);
+    
+    @Query("DELETE FROM tasks WHERE user_id = :userId AND name LIKE :namePattern AND start_date > :currentDate AND is_recurring = 0")
+    void deleteFutureRecurringInstances(String userId, String namePattern, String currentDate);
 }
