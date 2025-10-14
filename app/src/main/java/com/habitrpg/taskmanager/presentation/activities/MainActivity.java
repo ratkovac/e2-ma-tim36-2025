@@ -57,13 +57,19 @@ public class MainActivity extends AppCompatActivity {
         binding.bottomNavigation.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             if (itemId == R.id.navigation_tasks) {
-                // Navigate to tasks
+                navController.navigate(R.id.navigation_tasks);
                 return true;
-            } else if (itemId == R.id.navigation_profile) {
-                // Navigate to profile
+            } else if (itemId == R.id.navigation_calendar) {
+                navController.navigate(R.id.navigation_calendar);
                 return true;
             } else if (itemId == R.id.navigation_categories) {
-                // Navigate to categories
+                navController.navigate(R.id.navigation_categories);
+                return true;
+            } else if (itemId == R.id.navigation_statistics) {
+                navController.navigate(R.id.navigation_statistics);
+                return true;
+            } else if (itemId == R.id.navigation_friends) {
+                navController.navigate(R.id.navigation_friends);
                 return true;
             }
             return false;

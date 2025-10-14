@@ -98,9 +98,57 @@ public class UserRepository {
         
         executor.execute(() -> {
             try {
-                database.userDao().logoutAllUsers();
-                database.userDao().loginUser(userId);
-                callback.onSuccess("User logged in successfully");
+                // First check if user exists in local database
+                User localUser = database.userDao().getUserById(userId);
+                
+                if (localUser == null) {
+                    // User doesn't exist locally, fetch from Firebase
+                    firebaseManager.getUserDocument(userId, userData -> {
+                        if (userData != null) {
+                            // Create user from Firebase data
+                            User user = new User();
+                            user.setId(userId);
+                            user.setEmail((String) userData.get("email"));
+                            user.setUsername((String) userData.get("username"));
+                            
+                            Object avatarIdObj = userData.get("avatarId");
+                            user.setAvatarId(avatarIdObj != null ? ((Number) avatarIdObj).intValue() : 1);
+                            
+                            Object levelObj = userData.get("level");
+                            user.setLevel(levelObj != null ? ((Number) levelObj).intValue() : 1);
+                            
+                            user.setTitle((String) userData.getOrDefault("title", "Beginner"));
+                            
+                            Object powerPointsObj = userData.get("powerPoints");
+                            user.setPowerPoints(powerPointsObj != null ? ((Number) powerPointsObj).intValue() : 0);
+                            
+                            Object xpObj = userData.get("experiencePoints");
+                            user.setExperiencePoints(xpObj != null ? ((Number) xpObj).intValue() : 0);
+                            
+                            Object coinsObj = userData.get("coins");
+                            user.setCoins(coinsObj != null ? ((Number) coinsObj).intValue() : 300);
+                            
+                            // Insert user into local database
+                            executor.execute(() -> {
+                                try {
+                                    database.userDao().insertUser(user);
+                                    database.userDao().logoutAllUsers();
+                                    database.userDao().loginUser(userId);
+                                    callback.onSuccess("User logged in successfully");
+                                } catch (Exception e) {
+                                    callback.onError("Failed to save user locally: " + e.getMessage());
+                                }
+                            });
+                        } else {
+                            callback.onError("User data not found in Firebase");
+                        }
+                    });
+                } else {
+                    // User exists locally, just update login status
+                    database.userDao().logoutAllUsers();
+                    database.userDao().loginUser(userId);
+                    callback.onSuccess("User logged in successfully");
+                }
             } catch (Exception e) {
                 callback.onError("Failed to login user: " + e.getMessage());
             }

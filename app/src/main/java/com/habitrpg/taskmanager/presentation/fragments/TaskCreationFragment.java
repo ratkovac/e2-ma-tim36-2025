@@ -35,6 +35,11 @@ public class TaskCreationFragment extends Fragment {
     private List<Category> categories;
     private int selectedCategoryId = -1;
     
+    // Edit mode variables
+    private boolean isEditMode = false;
+    private int editTaskId = -1;
+    private Task currentTask = null;
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
@@ -49,10 +54,21 @@ public class TaskCreationFragment extends Fragment {
         taskService = TaskService.getInstance(requireContext());
         categoryService = CategoryService.getInstance(requireContext());
         
+        // Check if edit mode
+        if (getArguments() != null) {
+            isEditMode = getArguments().getBoolean("isEdit", false);
+            editTaskId = getArguments().getInt("taskId", -1);
+        }
+
         setupToolbar();
         setupSpinners();
         setupClickListeners();
         loadCategories();
+
+        // Load task data if edit mode
+        if (isEditMode && editTaskId != -1) {
+            loadTaskForEdit();
+        }
     }
     
     private void setupToolbar() {
@@ -60,7 +76,7 @@ public class TaskCreationFragment extends Fragment {
             Navigation.findNavController(v).navigateUp();
         });
     }
-    
+
     private void setupSpinners() {
         // Difficulty spinner
         String[] difficulties = {"Veoma lak", "Lak", "Težak", "Ekstremno težak"};
@@ -108,22 +124,132 @@ public class TaskCreationFragment extends Fragment {
         categoryService.getAllCategories(new CategoryService.CategoryCallback() {
             @Override
             public void onSuccess(String message) {}
-            
+
             @Override
             public void onError(String error) {
                 requireActivity().runOnUiThread(() -> {
                     Toast.makeText(getContext(), "Failed to load categories: " + error, Toast.LENGTH_SHORT).show();
                 });
             }
-            
+
+
             @Override
             public void onCategoriesRetrieved(List<Category> categories) {
-                TaskCreationFragment.this.categories = categories;
-                setupCategorySpinner();
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        TaskCreationFragment.this.categories = categories;
+                        setupCategorySpinner();
+
+                        // If edit mode, populate the form after categories are loaded
+                        if (isEditMode && currentTask != null) {
+                            populateFormWithTask();
+                        }
+                    });
+                }
             }
         });
     }
-    
+
+    private void loadTaskForEdit() {
+        taskService.getTaskById(editTaskId, new TaskService.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Greška: " + error, Toast.LENGTH_SHORT).show();
+                        requireActivity().onBackPressed();
+                    });
+                }
+            }
+
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {
+                if (getActivity() != null && tasks != null && !tasks.isEmpty()) {
+                    currentTask = tasks.get(0);
+
+                    // Check if task is completed
+                    if ("completed".equals(currentTask.getStatus())) {
+                        getActivity().runOnUiThread(() -> {
+                            Toast.makeText(getContext(), "Ne možete menjati završen zadatak", Toast.LENGTH_SHORT).show();
+                            requireActivity().onBackPressed();
+                        });
+                        return;
+                    }
+
+                    // Populate form will be called after categories load
+                }
+            }
+        });
+    }
+
+    private void populateFormWithTask() {
+        if (currentTask == null || categories == null) return;
+
+        // Update title and button text
+        binding.editTextTaskName.setText(currentTask.getName());
+
+        if (currentTask.getDescription() != null) {
+            binding.editTextDescription.setText(currentTask.getDescription());
+        }
+
+        // Set category
+        for (int i = 0; i < categories.size(); i++) {
+            if (categories.get(i).getId() == currentTask.getCategoryId()) {
+                binding.spinnerCategory.setSelection(i);
+                selectedCategoryId = currentTask.getCategoryId();
+                break;
+            }
+        }
+
+        // Set difficulty
+        String[] difficultyValues = {"very_easy", "easy", "hard", "extreme"};
+        for (int i = 0; i < difficultyValues.length; i++) {
+            if (difficultyValues[i].equals(currentTask.getDifficulty())) {
+                binding.spinnerDifficulty.setSelection(i);
+                break;
+            }
+        }
+
+        // Set importance
+        String[] importanceValues = {"normal", "important", "very_important", "special"};
+        for (int i = 0; i < importanceValues.length; i++) {
+            if (importanceValues[i].equals(currentTask.getImportance())) {
+                binding.spinnerImportance.setSelection(i);
+                break;
+            }
+        }
+
+        // Set dates and time
+        if (currentTask.getStartDate() != null) {
+            binding.btnStartDate.setText(currentTask.getStartDate());
+        }
+
+        if (currentTask.getExecutionTime() != null) {
+            binding.btnExecutionTime.setText(currentTask.getExecutionTime());
+        }
+
+        // Disable recurring options for edit (can't change recurring settings)
+        binding.checkboxRecurring.setEnabled(false);
+        binding.checkboxRecurring.setChecked(currentTask.isRecurring());
+
+        if (currentTask.isRecurring()) {
+            binding.editTextRecurrenceInterval.setText(String.valueOf(currentTask.getRecurrenceInterval()));
+            if (currentTask.getEndDate() != null) {
+                binding.btnEndDate.setText(currentTask.getEndDate());
+            }
+            String[] recurrenceUnitValues = {"day", "week"};
+            for (int i = 0; i < recurrenceUnitValues.length; i++) {
+                if (recurrenceUnitValues[i].equals(currentTask.getRecurrenceUnit())) {
+                    binding.spinnerRecurrenceUnit.setSelection(i);
+                    break;
+                }
+            }
+        }
+    }
+
     private void setupCategorySpinner() {
         if (categories == null || categories.isEmpty()) {
             Toast.makeText(getContext(), "Prvo napravite kategoriju u sekciji Categories!", Toast.LENGTH_LONG).show();
@@ -209,6 +335,54 @@ public class TaskCreationFragment extends Fragment {
         String difficulty = difficultyValues[binding.spinnerDifficulty.getSelectedItemPosition()];
         String importance = importanceValues[binding.spinnerImportance.getSelectedItemPosition()];
         
+        if (isEditMode) {
+            // Update existing task
+            updateTask(name, difficulty, importance);
+        } else {
+            // Create new task
+            createNewTask(name, difficulty, importance);
+        }
+    }
+
+    private void updateTask(String name, String difficulty, String importance) {
+        if (currentTask == null) return;
+
+        // Update only allowed fields: name, description, execution time, difficulty, importance
+        currentTask.setName(name);
+        currentTask.setDescription(binding.editTextDescription.getText().toString().trim());
+        currentTask.setDifficulty(difficulty);
+        currentTask.setImportance(importance);
+        currentTask.setExecutionTime(binding.btnExecutionTime.getText().toString());
+        currentTask.setStartDate(binding.btnStartDate.getText().toString());
+
+        taskService.updateTask(currentTask, new TaskService.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Zadatak ažuriran", Toast.LENGTH_SHORT).show();
+                        requireActivity().onBackPressed();
+                    });
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Greška: " + error, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }
+
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+        });
+    }
+
+    private void createNewTask(String name, String difficulty, String importance) {
+        String[] recurrenceUnitValues = (String[]) binding.spinnerRecurrenceUnit.getTag();
+
         // Create task
         Task task = new Task();
         task.setUserId(taskService.getCurrentUserId());
@@ -218,7 +392,9 @@ public class TaskCreationFragment extends Fragment {
         task.setDifficulty(difficulty);
         task.setImportance(importance);
         task.setExecutionTime(binding.btnExecutionTime.getText().toString());
-        
+        // Default start date for one-off tasks is today
+        task.setStartDate(com.habitrpg.taskmanager.util.DateUtils.getCurrentDateString());
+
         // Handle recurring task
         boolean isRecurring = binding.checkboxRecurring.isChecked();
         task.setRecurring(isRecurring);
