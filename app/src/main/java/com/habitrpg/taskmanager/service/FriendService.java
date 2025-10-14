@@ -144,15 +144,21 @@ public class FriendService {
         }
         
         try {
-            String[] qrParts = qrData.split("\\|");
-            if (qrParts.length != 3) {
+            // Parse QR data format: "TaskManager:userId:username:email"
+            if (!qrData.startsWith("TaskManager:")) {
+                callback.onError("Invalid QR code format - not from TaskManager");
+                return;
+            }
+            
+            String[] qrParts = qrData.split(":");
+            if (qrParts.length != 4) {
                 callback.onError("Invalid QR code format");
                 return;
             }
             
-            String friendUserId = qrParts[0];
-            String friendUsername = qrParts[1];
-            String friendEmail = qrParts[2];
+            String friendUserId = qrParts[1]; // Skip "TaskManager" prefix
+            String friendUsername = qrParts[2];
+            String friendEmail = qrParts[3];
             
             if (friendUserId.equals(currentUserId)) {
                 callback.onError("Cannot add yourself as a friend");
