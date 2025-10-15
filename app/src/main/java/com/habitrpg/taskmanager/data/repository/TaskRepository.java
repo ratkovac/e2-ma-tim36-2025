@@ -15,34 +15,34 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class TaskRepository {
-    
+
     private static TaskRepository instance;
     private AppDatabase database;
     private UserPreferences userPreferences;
     private ExecutorService executor;
-    
+
     private TaskRepository(Context context) {
         database = AppDatabase.getDatabase(context);
         userPreferences = UserPreferences.getInstance(context);
         executor = Executors.newFixedThreadPool(2);
     }
-    
+
     public static synchronized TaskRepository getInstance(Context context) {
         if (instance == null) {
             instance = new TaskRepository(context.getApplicationContext());
         }
         return instance;
     }
-    
+
     private void ensureExecutorActive() {
         if (executor.isShutdown()) {
             executor = Executors.newFixedThreadPool(2);
         }
     }
-    
+
     public void insertTask(Task task, TaskCallback callback) {
         ensureExecutorActive();
-        
+
         executor.execute(() -> {
             try {
                 long taskId = database.taskDao().insertTask(task);
@@ -53,10 +53,10 @@ public class TaskRepository {
             }
         });
     }
-    
+
     public void updateTask(Task task, TaskCallback callback) {
         ensureExecutorActive();
-        
+
         executor.execute(() -> {
             try {
                 database.taskDao().updateTask(task);
@@ -66,10 +66,10 @@ public class TaskRepository {
             }
         });
     }
-    
+
     public void updateTaskStatus(int taskId, String status, TaskCallback callback) {
         ensureExecutorActive();
-        
+
         executor.execute(() -> {
             try {
                 database.taskDao().updateTaskStatus(taskId, status);
@@ -79,10 +79,10 @@ public class TaskRepository {
             }
         });
     }
-    
+
     public void getTaskById(int taskId, TaskCallback callback) {
         ensureExecutorActive();
-        
+
         executor.execute(() -> {
             try {
                 Task task = database.taskDao().getTaskById(taskId);
@@ -92,10 +92,10 @@ public class TaskRepository {
             }
         });
     }
-    
+
     public void getActiveTasksByUserId(String userId, TaskCallback callback) {
         ensureExecutorActive();
-        
+
         executor.execute(() -> {
             try {
                 List<Task> tasks = database.taskDao().getActiveTasksByUserId(userId);
@@ -105,10 +105,10 @@ public class TaskRepository {
             }
         });
     }
-    
+
     public void getTasksByUserId(String userId, TaskCallback callback) {
         ensureExecutorActive();
-        
+
         executor.execute(() -> {
             try {
                 List<Task> tasks = database.taskDao().getActiveTasksByUserId(userId);
@@ -118,14 +118,14 @@ public class TaskRepository {
             }
         });
     }
-    
+
     public void getAllTasks(String userId, TaskCallback callback) {
         getTasksByUserId(userId, callback);
     }
-    
+
     public void insertTaskCompletion(TaskCompletion completion, TaskCallback callback) {
         ensureExecutorActive();
-        
+
         executor.execute(() -> {
             try {
                 database.taskCompletionDao().insertTaskCompletion(completion);
@@ -135,7 +135,86 @@ public class TaskRepository {
             }
         });
     }
-    
+
+    public void getTaskCountByDifficultyAndImportanceForDate(String userId, String difficulty, String importance, String date, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                int count = database.taskDao().getTaskCountByDifficultyAndImportanceForDate(userId, difficulty, importance, date);
+                callback.onTaskCountRetrieved(count);
+            } catch (Exception e) {
+                callback.onError("Failed to get daily quota count: " + e.getMessage());
+            }
+        });
+    }
+
+    public void getExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                int count = database.taskDao().getExtremeTaskCountForWeek(userId, weekStart, weekEnd);
+                callback.onTaskCountRetrieved(count);
+            } catch (Exception e) {
+                callback.onError("Failed to get weekly extreme count: " + e.getMessage());
+            }
+        });
+    }
+
+    public void getSpecialTaskCountForMonth(String userId, String monthStart, String monthEnd, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                int count = database.taskDao().getSpecialTaskCountForMonth(userId, monthStart, monthEnd);
+                callback.onTaskCountRetrieved(count);
+            } catch (Exception e) {
+                callback.onError("Failed to get monthly special count: " + e.getMessage());
+            }
+        });
+    }
+
+    public void getTasksByDate(String userId, String date, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                List<Task> tasks = database.taskDao().getTasksByDate(userId, date);
+                callback.onTasksRetrieved(tasks);
+            } catch (Exception e) {
+                callback.onError("Failed to get tasks by date: " + e.getMessage());
+            }
+        });
+    }
+
+    public void getTasksInDateRange(String userId, String startDate, String endDate, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                List<Task> tasks = database.taskDao().getTasksInDateRange(userId, startDate, endDate);
+                callback.onTasksRetrieved(tasks);
+            } catch (Exception e) {
+                callback.onError("Failed to get tasks in date range: " + e.getMessage());
+            }
+        });
+    }
+
+    public void deleteTask(int taskId, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                database.taskDao().deleteTaskById(taskId);
+                callback.onSuccess("Task deleted successfully");
+            } catch (Exception e) {
+                callback.onError("Failed to delete task: " + e.getMessage());
+            }
+        });
+    }
+
+
     public interface TaskCallback {
         void onSuccess(String message);
         void onError(String error);

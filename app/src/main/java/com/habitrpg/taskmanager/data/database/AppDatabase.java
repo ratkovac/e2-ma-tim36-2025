@@ -26,7 +26,7 @@ import com.habitrpg.taskmanager.data.database.entities.UserStatistics;
 @Database(
     entities = {User.class, Category.class, Task.class, TaskCompletion.class, UserStatistics.class, 
                 Friend.class, FriendRequest.class, Guild.class, GuildMember.class, GuildInvite.class},
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
@@ -49,7 +49,9 @@ public abstract class AppDatabase extends RoomDatabase {
                             context.getApplicationContext(),
                             AppDatabase.class,
                             "habit_rpg_database"
-                    ).build();
+                    )
+                    .fallbackToDestructiveMigration()
+                    .build();
                 }
             }
         }

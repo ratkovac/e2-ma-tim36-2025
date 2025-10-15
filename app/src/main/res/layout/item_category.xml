@@ -36,12 +36,27 @@
 
         <!-- Edit Icon -->
         <ImageView
+            android:id="@+id/ivEdit"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:layout_gravity="center_vertical"
             android:layout_marginStart="8dp"
             android:src="@android:drawable/ic_menu_edit"
-            android:contentDescription="Edit category" />
+            android:contentDescription="Edit category"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:padding="4dp" />
+
+        <!-- Delete Icon -->
+        <ImageView
+            android:id="@+id/ivDelete"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="8dp"
+            android:src="@android:drawable/ic_menu_delete"
+            android:contentDescription="Delete category"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:padding="4dp" />
 
     </LinearLayout>
 

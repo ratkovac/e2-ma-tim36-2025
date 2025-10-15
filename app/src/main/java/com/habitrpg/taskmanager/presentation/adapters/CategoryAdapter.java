@@ -4,6 +4,7 @@ import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -22,6 +23,8 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
     public interface OnCategoryClickListener {
         void onCategoryClick(Category category);
         void onCategoryLongClick(Category category);
+        void onEditClick(Category category);
+        void onDeleteClick(Category category);
     }
     
     public CategoryAdapter(List<Category> categories, OnCategoryClickListener listener) {
@@ -56,11 +59,15 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
     class CategoryViewHolder extends RecyclerView.ViewHolder {
         private TextView tvCategoryName;
         private View colorIndicator;
+        private ImageView ivEdit;
+        private ImageView ivDelete;
         
         public CategoryViewHolder(@NonNull View itemView) {
             super(itemView);
             tvCategoryName = itemView.findViewById(R.id.tvCategoryName);
             colorIndicator = itemView.findViewById(R.id.colorIndicator);
+            ivEdit = itemView.findViewById(R.id.ivEdit);
+            ivDelete = itemView.findViewById(R.id.ivDelete);
             
             itemView.setOnClickListener(v -> {
                 if (listener != null) {
@@ -80,6 +87,24 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
                     }
                 }
                 return false;
+            });
+            
+            ivEdit.setOnClickListener(v -> {
+                if (listener != null) {
+                    int position = getAdapterPosition();
+                    if (position != RecyclerView.NO_POSITION) {
+                        listener.onEditClick(categories.get(position));
+                    }
+                }
+            });
+            
+            ivDelete.setOnClickListener(v -> {
+                if (listener != null) {
+                    int position = getAdapterPosition();
+                    if (position != RecyclerView.NO_POSITION) {
+                        listener.onDeleteClick(categories.get(position));
+                    }
+                }
             });
         }
         

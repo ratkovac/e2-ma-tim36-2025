@@ -17,13 +17,33 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <!-- Title and Calendar Button Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Today's Tasks"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_on_primary" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Today's Tasks"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_on_primary" />
+
+            <ImageButton
+                android:id="@+id/btnCalendar"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_calendar"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="View Calendar"
+                android:padding="8dp"
+                android:tint="@color/text_on_primary" />
+
+        </LinearLayout>
 
         <TextView
             android:id="@+id/tvDate"
@@ -35,6 +55,38 @@
 
     </LinearLayout>
 
+    <!-- Tabs for filtering -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/white"
+        app:tabMode="fixed"
+        app:tabGravity="fill"
+        app:tabSelectedTextColor="@color/primary_color"
+        app:tabTextColor="@android:color/darker_gray"
+        app:tabIndicatorColor="@color/primary_color"
+        app:layout_constraintTop_toBottomOf="@id/headerLayout"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Svi" />
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Jednokratni" />
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Ponavljajući" />
+
+    </com.google.android.material.tabs.TabLayout>
+
     <!-- Empty State -->
     <LinearLayout
         android:id="@+id/layoutEmptyState"
@@ -44,7 +96,7 @@
         android:gravity="center"
         android:padding="32dp"
         android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/headerLayout"
+        app:layout_constraintTop_toBottomOf="@id/tabLayout"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -82,7 +134,7 @@
         android:layout_height="0dp"
         android:padding="8dp"
         android:clipToPadding="false"
-        app:layout_constraintTop_toBottomOf="@id/headerLayout"
+        app:layout_constraintTop_toBottomOf="@id/tabLayout"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />

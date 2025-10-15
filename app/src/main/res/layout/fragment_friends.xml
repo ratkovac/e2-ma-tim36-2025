@@ -130,6 +130,18 @@
 
     </LinearLayout>
 
+    <!-- Guild Button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnGuild"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:text="Guild"
+        android:textSize="14sp"
+        app:layout_constraintBottom_toTopOf="@id/fabScanQR"
+        app:layout_constraintEnd_toEndOf="parent"
+        style="@style/Widget.Material3.Button.OutlinedButton" />
+
     <!-- Floating Action Button for QR Scanner -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabScanQR"

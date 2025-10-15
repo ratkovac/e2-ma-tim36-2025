@@ -35,6 +35,11 @@ public class TaskCreationFragment extends Fragment {
     private List<Category> categories;
     private int selectedCategoryId = -1;
     
+    // Edit mode variables
+    private boolean isEditMode = false;
+    private int editTaskId = -1;
+    private Task currentTask = null;
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
@@ -49,10 +54,21 @@ public class TaskCreationFragment extends Fragment {
         taskService = TaskService.getInstance(requireContext());
         categoryService = CategoryService.getInstance(requireContext());
         
+        // Check if edit mode
+        if (getArguments() != null) {
+            isEditMode = getArguments().getBoolean("isEdit", false);
+            editTaskId = getArguments().getInt("taskId", -1);
+        }
+
         setupToolbar();
         setupSpinners();
         setupClickListeners();
         loadCategories();
+
+        // Load task data if edit mode
+        if (isEditMode && editTaskId != -1) {
+            loadTaskForEdit();
+        }
     }
     
     private void setupToolbar() {
@@ -60,7 +76,7 @@ public class TaskCreationFragment extends Fragment {
             Navigation.findNavController(v).navigateUp();
         });
     }
-    
+
     private void setupSpinners() {
         // Difficulty spinner
         String[] difficulties = {"Veoma lak", "Lak", "Težak", "Ekstremno težak"};
@@ -97,8 +113,8 @@ public class TaskCreationFragment extends Fragment {
             binding.layoutRecurringOptions.setVisibility(isChecked ? View.VISIBLE : View.GONE);
         });
         
-        binding.btnStartDate.setOnClickListener(v -> showDatePickerDialog(true));
-        binding.btnEndDate.setOnClickListener(v -> showDatePickerDialog(false));
+        binding.btnStartDate.setOnClickListener(v -> showDatePickerDialog());
+        binding.btnEndDate.setOnClickListener(v -> showEndDatePickerDialog());
         binding.btnExecutionTime.setOnClickListener(v -> showTimePickerDialog());
         
         binding.btnCreateTask.setOnClickListener(v -> createTask());
@@ -108,22 +124,137 @@ public class TaskCreationFragment extends Fragment {
         categoryService.getAllCategories(new CategoryService.CategoryCallback() {
             @Override
             public void onSuccess(String message) {}
-            
+
             @Override
             public void onError(String error) {
                 requireActivity().runOnUiThread(() -> {
                     Toast.makeText(getContext(), "Failed to load categories: " + error, Toast.LENGTH_SHORT).show();
                 });
             }
-            
+
+
             @Override
             public void onCategoriesRetrieved(List<Category> categories) {
-                TaskCreationFragment.this.categories = categories;
-                setupCategorySpinner();
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        TaskCreationFragment.this.categories = categories;
+                        setupCategorySpinner();
+
+                        // If edit mode, populate the form after categories are loaded
+                        if (isEditMode && currentTask != null) {
+                            populateFormWithTask();
+                        }
+                    });
+                }
             }
         });
     }
-    
+
+    private void loadTaskForEdit() {
+        taskService.getTaskById(editTaskId, new TaskService.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Greška: " + error, Toast.LENGTH_SHORT).show();
+                        requireActivity().onBackPressed();
+                    });
+                }
+            }
+
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {
+                if (getActivity() != null && tasks != null && !tasks.isEmpty()) {
+                    currentTask = tasks.get(0);
+
+                    // Check if task is completed
+                    if ("completed".equals(currentTask.getStatus())) {
+                        getActivity().runOnUiThread(() -> {
+                            Toast.makeText(getContext(), "Ne možete menjati završen zadatak", Toast.LENGTH_SHORT).show();
+                            requireActivity().onBackPressed();
+                        });
+                        return;
+                    }
+
+                    // Populate form will be called after categories load
+                }
+            }
+        });
+    }
+
+    private void populateFormWithTask() {
+        if (currentTask == null || categories == null) return;
+
+        // Update title and button text
+        binding.editTextTaskName.setText(currentTask.getName());
+
+        if (currentTask.getDescription() != null) {
+            binding.editTextDescription.setText(currentTask.getDescription());
+        }
+
+        // Set category
+        for (int i = 0; i < categories.size(); i++) {
+            if (categories.get(i).getId() == currentTask.getCategoryId()) {
+                binding.spinnerCategory.setSelection(i);
+                selectedCategoryId = currentTask.getCategoryId();
+                break;
+            }
+        }
+
+        // Set difficulty
+        String[] difficultyValues = {"very_easy", "easy", "hard", "extreme"};
+        for (int i = 0; i < difficultyValues.length; i++) {
+            if (difficultyValues[i].equals(currentTask.getDifficulty())) {
+                binding.spinnerDifficulty.setSelection(i);
+                break;
+            }
+        }
+
+        // Set importance
+        String[] importanceValues = {"normal", "important", "very_important", "special"};
+        for (int i = 0; i < importanceValues.length; i++) {
+            if (importanceValues[i].equals(currentTask.getImportance())) {
+                binding.spinnerImportance.setSelection(i);
+                break;
+            }
+        }
+
+        // Set dates and time - parse combined start_date
+        if (currentTask.getStartDate() != null) {
+            String startDateTime = currentTask.getStartDate();
+            if (startDateTime.contains(" ")) {
+                String[] parts = startDateTime.split(" ");
+                binding.btnStartDate.setText(parts[0]); // Date part
+                if (parts.length > 1) {
+                    binding.btnExecutionTime.setText(parts[1]); // Time part
+                }
+            } else {
+                binding.btnStartDate.setText(startDateTime);
+            }
+        }
+
+        // Disable recurring options for edit (can't change recurring settings)
+        binding.checkboxRecurring.setEnabled(false);
+        binding.checkboxRecurring.setChecked(currentTask.isRecurring());
+
+        if (currentTask.isRecurring()) {
+            binding.editTextRecurrenceInterval.setText(String.valueOf(currentTask.getRecurrenceInterval()));
+            if (currentTask.getEndDate() != null) {
+                binding.btnEndDate.setText(currentTask.getEndDate());
+            }
+            String[] recurrenceUnitValues = {"day", "week"};
+            for (int i = 0; i < recurrenceUnitValues.length; i++) {
+                if (recurrenceUnitValues[i].equals(currentTask.getRecurrenceUnit())) {
+                    binding.spinnerRecurrenceUnit.setSelection(i);
+                    break;
+                }
+            }
+        }
+    }
+
     private void setupCategorySpinner() {
         if (categories == null || categories.isEmpty()) {
             Toast.makeText(getContext(), "Prvo napravite kategoriju u sekciji Categories!", Toast.LENGTH_LONG).show();
@@ -156,16 +287,26 @@ public class TaskCreationFragment extends Fragment {
         });
     }
     
-    private void showDatePickerDialog(boolean isStartDate) {
+    private void showDatePickerDialog() {
         Calendar calendar = Calendar.getInstance();
         DatePickerDialog datePickerDialog = new DatePickerDialog(requireContext(),
             (view, year, month, dayOfMonth) -> {
                 String date = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth);
-                if (isStartDate) {
-                    binding.btnStartDate.setText(date);
-                } else {
-                    binding.btnEndDate.setText(date);
-                }
+                binding.btnStartDate.setText(date);
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        );
+        datePickerDialog.show();
+    }
+    
+    private void showEndDatePickerDialog() {
+        Calendar calendar = Calendar.getInstance();
+        DatePickerDialog datePickerDialog = new DatePickerDialog(requireContext(),
+            (view, year, month, dayOfMonth) -> {
+                String date = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth);
+                binding.btnEndDate.setText(date);
             },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),
@@ -209,6 +350,59 @@ public class TaskCreationFragment extends Fragment {
         String difficulty = difficultyValues[binding.spinnerDifficulty.getSelectedItemPosition()];
         String importance = importanceValues[binding.spinnerImportance.getSelectedItemPosition()];
         
+        if (isEditMode) {
+            // Update existing task
+            updateTask(name, difficulty, importance);
+        } else {
+            // Create new task
+            createNewTask(name, difficulty, importance);
+        }
+    }
+
+    private void updateTask(String name, String difficulty, String importance) {
+        if (currentTask == null) return;
+
+        // Update only allowed fields: name, description, start date and time, difficulty, importance
+        currentTask.setName(name);
+        currentTask.setDescription(binding.editTextDescription.getText().toString().trim());
+        currentTask.setDifficulty(difficulty);
+        currentTask.setImportance(importance);
+        
+        // Combine date and time for start_date
+        String startDate = binding.btnStartDate.getText().toString();
+        String executionTime = binding.btnExecutionTime.getText().toString();
+        if (!startDate.equals("Select Date") && !executionTime.equals("Select Time")) {
+            currentTask.setStartDate(startDate + " " + executionTime);
+        }
+
+        taskService.updateTask(currentTask, new TaskService.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Zadatak ažuriran", Toast.LENGTH_SHORT).show();
+                        requireActivity().onBackPressed();
+                    });
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Greška: " + error, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }
+
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+        });
+    }
+
+    private void createNewTask(String name, String difficulty, String importance) {
+        String[] recurrenceUnitValues = (String[]) binding.spinnerRecurrenceUnit.getTag();
+
         // Create task
         Task task = new Task();
         task.setUserId(taskService.getCurrentUserId());
@@ -217,8 +411,16 @@ public class TaskCreationFragment extends Fragment {
         task.setDescription(binding.editTextDescription.getText().toString().trim());
         task.setDifficulty(difficulty);
         task.setImportance(importance);
-        task.setExecutionTime(binding.btnExecutionTime.getText().toString());
-        
+        // Combine date and time for start_date
+        String startDate = binding.btnStartDate.getText().toString();
+        String executionTime = binding.btnExecutionTime.getText().toString();
+        if (!startDate.equals("Select Date") && !executionTime.equals("Select Time")) {
+            task.setStartDate(startDate + " " + executionTime);
+        } else {
+            // Default to current date and time if not set
+            task.setStartDate(com.habitrpg.taskmanager.util.DateUtils.getCurrentDateTimeString());
+        }
+
         // Handle recurring task
         boolean isRecurring = binding.checkboxRecurring.isChecked();
         task.setRecurring(isRecurring);
@@ -279,7 +481,7 @@ public class TaskCreationFragment extends Fragment {
         binding.editTextTaskName.setText("");
         binding.editTextDescription.setText("");
         binding.editTextRecurrenceInterval.setText("");
-        binding.btnStartDate.setText("Select Start Date");
+        binding.btnStartDate.setText("Select Date");
         binding.btnEndDate.setText("Select End Date");
         binding.btnExecutionTime.setText("Select Time");
         binding.checkboxRecurring.setChecked(false);

@@ -85,6 +85,7 @@ public class FriendsFragment extends Fragment {
     
     private void setupClickListeners() {
         binding.fabScanQR.setOnClickListener(v -> scanQRCode());
+        binding.btnGuild.setOnClickListener(v -> navigateToGuild());
         
         binding.searchView.setOnQueryTextListener(new androidx.appcompat.widget.SearchView.OnQueryTextListener() {
             @Override
@@ -203,6 +204,10 @@ public class FriendsFragment extends Fragment {
         integrator.setBeepEnabled(false);
         integrator.setBarcodeImageEnabled(true);
         integrator.initiateScan();
+    }
+    
+    private void navigateToGuild() {
+        Navigation.findNavController(requireView()).navigate(R.id.navigation_guild);
     }
     
     private void onFriendClick(Friend friend) {

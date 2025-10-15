@@ -67,12 +67,19 @@ public class CategoryRepository {
         executor.execute(() -> {
             try {
                 Category category = database.categoryDao().getCategoryById((int) categoryId);
-                if (category != null) {
-                    database.categoryDao().deleteCategory(category);
-                    callback.onSuccess("Category deleted successfully");
-                } else {
+                if (category == null) {
                     callback.onError("Category not found");
+                    return;
                 }
+
+                int activeCount = database.taskDao().getActiveTaskCountForCategory((int) categoryId);
+                if (activeCount > 0) {
+                    callback.onError("Cannot delete category with active tasks");
+                    return;
+                }
+
+                database.categoryDao().deleteCategory(category);
+                callback.onSuccess("Category deleted successfully");
             } catch (Exception e) {
                 callback.onError("Failed to delete category: " + e.getMessage());
             }
@@ -101,6 +108,28 @@ public class CategoryRepository {
                 callback.onCategoriesRetrieved(categories);
             } catch (Exception e) {
                 callback.onError("Failed to get categories: " + e.getMessage());
+            }
+        });
+    }
+
+    public void getCategoryByColor(String userId, String color, CategoryCallback callback) {
+        executor.execute(() -> {
+            try {
+                Category category = database.categoryDao().getCategoryByColor(userId, color);
+                callback.onCategoryRetrieved(category);
+            } catch (Exception e) {
+                callback.onError("Failed to get category by color: " + e.getMessage());
+            }
+        });
+    }
+
+    public void getCategoryByName(String userId, String name, CategoryCallback callback) {
+        executor.execute(() -> {
+            try {
+                Category category = database.categoryDao().getCategoryByName(userId, name);
+                callback.onCategoryRetrieved(category);
+            } catch (Exception e) {
+                callback.onError("Failed to get category by name: " + e.getMessage());
             }
         });
     }
