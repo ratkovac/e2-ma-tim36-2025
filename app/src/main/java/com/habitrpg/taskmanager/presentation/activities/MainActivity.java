@@ -10,6 +10,7 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.habitrpg.taskmanager.R;
 import com.habitrpg.taskmanager.service.AuthService;
+import com.habitrpg.taskmanager.service.TaskService;
 import com.habitrpg.taskmanager.databinding.ActivityMainBinding;
 
 public class MainActivity extends AppCompatActivity {
@@ -38,6 +39,8 @@ public class MainActivity extends AppCompatActivity {
         // Delay navigation setup to ensure fragment is ready
         binding.getRoot().post(() -> {
             setupNavigation();
+            // Check and update overdue tasks
+            checkOverdueTasks();
         });
     }
     
@@ -59,9 +62,6 @@ public class MainActivity extends AppCompatActivity {
             if (itemId == R.id.navigation_tasks) {
                 navController.navigate(R.id.navigation_tasks);
                 return true;
-            } else if (itemId == R.id.navigation_calendar) {
-                navController.navigate(R.id.navigation_calendar);
-                return true;
             } else if (itemId == R.id.navigation_categories) {
                 navController.navigate(R.id.navigation_categories);
                 return true;
@@ -76,6 +76,11 @@ public class MainActivity extends AppCompatActivity {
         });
     }
     
+    
+    private void checkOverdueTasks() {
+        TaskService taskService = TaskService.getInstance(this);
+        taskService.checkAndUpdateOverdueTasks();
+    }
     
     private void navigateToLogin() {
         Intent intent = new Intent(this, AuthActivity.class);

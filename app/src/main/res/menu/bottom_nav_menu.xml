@@ -5,10 +5,6 @@
         android:icon="@drawable/ic_tasks"
         android:title="Tasks" />
     <item
-        android:id="@+id/navigation_calendar"
-        android:icon="@drawable/ic_calendar"
-        android:title="Calendar" />
-    <item
         android:id="@+id/navigation_categories"
         android:icon="@drawable/ic_categories"
         android:title="Categories" />

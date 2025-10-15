@@ -12,6 +12,11 @@ public class DateUtils {
         return sdf.format(new Date());
     }
     
+    public static String getCurrentDateTimeString() {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+        return sdf.format(new Date());
+    }
+    
     public static String[] getCurrentWeekDates() {
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.DAY_OF_WEEK, cal.getFirstDayOfWeek());

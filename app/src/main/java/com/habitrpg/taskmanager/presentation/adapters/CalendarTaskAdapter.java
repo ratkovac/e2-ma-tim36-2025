@@ -117,9 +117,15 @@ public class CalendarTaskAdapter extends RecyclerView.Adapter<CalendarTaskAdapte
             // Set task name
             tvTaskName.setText(task.getName());
             
-            // Set time slot
-            if (task.getExecutionTime() != null && !task.getExecutionTime().isEmpty()) {
-                tvTimeSlot.setText(task.getExecutionTime());
+            // Set time slot from combined start_date
+            if (task.getStartDate() != null && !task.getStartDate().isEmpty()) {
+                String startDateTime = task.getStartDate();
+                if (startDateTime.contains(" ")) {
+                    String[] parts = startDateTime.split(" ");
+                    tvTimeSlot.setText(parts[1]); // Time part
+                } else {
+                    tvTimeSlot.setText("--:--");
+                }
             } else {
                 tvTimeSlot.setText("--:--");
             }

@@ -102,11 +102,21 @@ public class TaskDetailFragment extends Fragment {
         // Category
         loadCategory(currentTask.getCategoryId());
         
-        // Dates and time
-        binding.tvStartDate.setText(currentTask.getStartDate() != null ? 
-                currentTask.getStartDate() : "Nije postavljeno");
-        binding.tvExecutionTime.setText(currentTask.getExecutionTime() != null ? 
-                currentTask.getExecutionTime() : "Nije postavljeno");
+        // Date and time (combined in start_date)
+        if (currentTask.getStartDate() != null) {
+            String startDateTime = currentTask.getStartDate();
+            if (startDateTime.contains(" ")) {
+                String[] parts = startDateTime.split(" ");
+                binding.tvStartDate.setText(parts[0]); // Date part
+                binding.tvExecutionTime.setText(parts[1]); // Time part
+            } else {
+                binding.tvStartDate.setText(startDateTime);
+                binding.tvExecutionTime.setText("Nije postavljeno");
+            }
+        } else {
+            binding.tvStartDate.setText("Nije postavljeno");
+            binding.tvExecutionTime.setText("Nije postavljeno");
+        }
         
         if (currentTask.getEndDate() != null && !currentTask.getEndDate().isEmpty()) {
             binding.layoutEndDate.setVisibility(View.VISIBLE);
@@ -120,7 +130,7 @@ public class TaskDetailFragment extends Fragment {
             binding.layoutRecurringInfo.setVisibility(View.VISIBLE);
             String recurringText = "Ponavlja se svakih " + 
                     currentTask.getRecurrenceInterval() + " " +
-                    (currentTask.getRecurrenceUnit().equals("day") ? "dan/a" : "nedelja/e");
+                    ("day".equals(currentTask.getRecurrenceUnit()) ? "dan/a" : "nedelja/e");
             binding.tvRecurringInfo.setText(recurringText);
         } else {
             binding.layoutRecurringInfo.setVisibility(View.GONE);
@@ -284,24 +294,55 @@ public class TaskDetailFragment extends Fragment {
     private void updateButtonStates() {
         String status = currentTask.getStatus();
         boolean isCompleted = status.equals("completed");
+        boolean isIncomplete = status.equals("incomplete");
+        boolean isCancelled = status.equals("cancelled");
+        boolean isPaused = status.equals("paused");
+        boolean isActive = status.equals("active");
         
-        // Disable current status button
-        binding.btnMarkCompleted.setEnabled(!isCompleted);
-        binding.btnMarkPaused.setEnabled(!status.equals("paused") && !isCompleted);
-        binding.btnMarkCancelled.setEnabled(!status.equals("cancelled") && !isCompleted);
-        binding.btnMarkActive.setEnabled(!status.equals("active") && !isCompleted);
+        // Pravila za dugmad prema specifikaciji:
+        // - Neurađen, otkazan i završen zadatak se ne mogu menjati
+        // - Samo aktivan zadatak može biti označen kao urađen, otkazan ili pauziran
+        // - Pauziran zadatak može samo da se aktivira (samo za ponavljajuće)
         
-        // Gray out disabled buttons
-        binding.btnMarkCompleted.setAlpha(isCompleted ? 0.5f : 1.0f);
-        binding.btnMarkPaused.setAlpha(status.equals("paused") || isCompleted ? 0.5f : 1.0f);
-        binding.btnMarkCancelled.setAlpha(status.equals("cancelled") || isCompleted ? 0.5f : 1.0f);
-        binding.btnMarkActive.setAlpha(status.equals("active") || isCompleted ? 0.5f : 1.0f);
+        // Završeno dugme - samo za aktivan zadatak
+        boolean canComplete = isActive;
+        binding.btnMarkCompleted.setEnabled(canComplete);
+        binding.btnMarkCompleted.setAlpha(canComplete ? 1.0f : 0.5f);
         
-        // Disable edit and delete buttons for completed tasks
-        binding.btnEditTask.setEnabled(!isCompleted);
-        binding.btnDeleteTask.setEnabled(!isCompleted);
-        binding.btnEditTask.setAlpha(isCompleted ? 0.5f : 1.0f);
-        binding.btnDeleteTask.setAlpha(isCompleted ? 0.5f : 1.0f);
+        // Pauzirano dugme - samo za aktivan ponavljajući zadatak
+        boolean canPause = isActive && currentTask.isRecurring();
+        binding.btnMarkPaused.setEnabled(canPause);
+        binding.btnMarkPaused.setAlpha(canPause ? 1.0f : 0.5f);
+        
+        // Otkazano dugme - samo za aktivan zadatak
+        boolean canCancel = isActive;
+        binding.btnMarkCancelled.setEnabled(canCancel);
+        binding.btnMarkCancelled.setAlpha(canCancel ? 1.0f : 0.5f);
+        
+        // Aktivno dugme - samo za pauziran ponavljajući zadatak
+        boolean canActivate = isPaused && currentTask.isRecurring();
+        binding.btnMarkActive.setEnabled(canActivate);
+        binding.btnMarkActive.setAlpha(canActivate ? 1.0f : 0.5f);
+        
+        // Edit i Delete dugmad - ne mogu se menjati neurađeni, otkazani i završeni zadaci
+        boolean canModify = !isCompleted && !isIncomplete && !isCancelled;
+        binding.btnEditTask.setEnabled(canModify);
+        binding.btnDeleteTask.setEnabled(canModify);
+        binding.btnEditTask.setAlpha(canModify ? 1.0f : 0.5f);
+        binding.btnDeleteTask.setAlpha(canModify ? 1.0f : 0.5f);
+        
+        // Dodaj tooltip tekst za objašnjenje zašto su dugmad onemogućena
+        if (!canPause && isActive) {
+            binding.btnMarkPaused.setText("⏸ Pauzirano\n(Samo ponavljajući)");
+        } else {
+            binding.btnMarkPaused.setText("⏸ Pauzirano");
+        }
+        
+        if (!canActivate && isPaused) {
+            binding.btnMarkActive.setText("► Aktivno\n(Samo ponavljajući)");
+        } else {
+            binding.btnMarkActive.setText("► Aktivno");
+        }
     }
     
     private String getDifficultyText(String difficulty) {

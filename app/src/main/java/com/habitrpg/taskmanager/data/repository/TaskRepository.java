@@ -214,19 +214,6 @@ public class TaskRepository {
         });
     }
 
-    public void deleteFutureRecurringInstances(String userId, String taskBaseName, String currentDate, TaskCallback callback) {
-        ensureExecutorActive();
-        
-        executor.execute(() -> {
-            try {
-                String namePattern = taskBaseName + " (%)";
-                database.taskDao().deleteFutureRecurringInstances(userId, namePattern, currentDate);
-                callback.onSuccess("Future recurring instances deleted successfully");
-            } catch (Exception e) {
-                callback.onError("Failed to delete future instances: " + e.getMessage());
-            }
-        });
-    }
 
     public interface TaskCallback {
         void onSuccess(String message);

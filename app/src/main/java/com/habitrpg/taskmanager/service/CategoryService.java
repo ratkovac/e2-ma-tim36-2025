@@ -91,55 +91,6 @@ public class CategoryService {
         });
     }
 
-    public void createCategory(String name, String color, CategoryCallback callback) {
-        String userId = userPreferences.getCurrentUserId();
-        if (userId == null) {
-            callback.onError("User not logged in");
-            return;
-        }
-
-        // Enforce unique color per user (async)
-        categoryRepository.getCategoryByColor(userId, color, new CategoryRepository.CategoryCallback() {
-            @Override
-            public void onSuccess(String message) {}
-
-            @Override
-            public void onError(String error) {
-                callback.onError(error);
-            }
-
-            @Override
-            public void onCategoryRetrieved(Category existingByColor) {
-                if (existingByColor != null) {
-                    callback.onError("Color already in use by another category");
-                    return;
-                }
-
-                Category category = new Category(userId, name, color);
-                categoryRepository.insertCategory(category, new CategoryRepository.CategoryCallback() {
-                    @Override
-                    public void onSuccess(String message) {
-                        callback.onSuccess(message);
-                    }
-
-                    @Override
-                    public void onError(String error) {
-                        callback.onError(error);
-                    }
-
-                    @Override
-                    public void onCategoryRetrieved(Category category) {}
-
-                    @Override
-                    public void onCategoriesRetrieved(List<Category> categories) {}
-                });
-            }
-
-            @Override
-            public void onCategoriesRetrieved(List<Category> categories) {}
-        });
-    }
-
     public void updateCategory(Category category, CategoryCallback callback) {
         String userId = userPreferences.getCurrentUserId();
         if (userId == null) {

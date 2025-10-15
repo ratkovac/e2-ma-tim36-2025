@@ -113,8 +113,8 @@ public class TaskCreationFragment extends Fragment {
             binding.layoutRecurringOptions.setVisibility(isChecked ? View.VISIBLE : View.GONE);
         });
         
-        binding.btnStartDate.setOnClickListener(v -> showDatePickerDialog(true));
-        binding.btnEndDate.setOnClickListener(v -> showDatePickerDialog(false));
+        binding.btnStartDate.setOnClickListener(v -> showDatePickerDialog());
+        binding.btnEndDate.setOnClickListener(v -> showEndDatePickerDialog());
         binding.btnExecutionTime.setOnClickListener(v -> showTimePickerDialog());
         
         binding.btnCreateTask.setOnClickListener(v -> createTask());
@@ -222,13 +222,18 @@ public class TaskCreationFragment extends Fragment {
             }
         }
 
-        // Set dates and time
+        // Set dates and time - parse combined start_date
         if (currentTask.getStartDate() != null) {
-            binding.btnStartDate.setText(currentTask.getStartDate());
-        }
-
-        if (currentTask.getExecutionTime() != null) {
-            binding.btnExecutionTime.setText(currentTask.getExecutionTime());
+            String startDateTime = currentTask.getStartDate();
+            if (startDateTime.contains(" ")) {
+                String[] parts = startDateTime.split(" ");
+                binding.btnStartDate.setText(parts[0]); // Date part
+                if (parts.length > 1) {
+                    binding.btnExecutionTime.setText(parts[1]); // Time part
+                }
+            } else {
+                binding.btnStartDate.setText(startDateTime);
+            }
         }
 
         // Disable recurring options for edit (can't change recurring settings)
@@ -282,16 +287,26 @@ public class TaskCreationFragment extends Fragment {
         });
     }
     
-    private void showDatePickerDialog(boolean isStartDate) {
+    private void showDatePickerDialog() {
         Calendar calendar = Calendar.getInstance();
         DatePickerDialog datePickerDialog = new DatePickerDialog(requireContext(),
             (view, year, month, dayOfMonth) -> {
                 String date = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth);
-                if (isStartDate) {
-                    binding.btnStartDate.setText(date);
-                } else {
-                    binding.btnEndDate.setText(date);
-                }
+                binding.btnStartDate.setText(date);
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        );
+        datePickerDialog.show();
+    }
+    
+    private void showEndDatePickerDialog() {
+        Calendar calendar = Calendar.getInstance();
+        DatePickerDialog datePickerDialog = new DatePickerDialog(requireContext(),
+            (view, year, month, dayOfMonth) -> {
+                String date = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth);
+                binding.btnEndDate.setText(date);
             },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),
@@ -347,13 +362,18 @@ public class TaskCreationFragment extends Fragment {
     private void updateTask(String name, String difficulty, String importance) {
         if (currentTask == null) return;
 
-        // Update only allowed fields: name, description, execution time, difficulty, importance
+        // Update only allowed fields: name, description, start date and time, difficulty, importance
         currentTask.setName(name);
         currentTask.setDescription(binding.editTextDescription.getText().toString().trim());
         currentTask.setDifficulty(difficulty);
         currentTask.setImportance(importance);
-        currentTask.setExecutionTime(binding.btnExecutionTime.getText().toString());
-        currentTask.setStartDate(binding.btnStartDate.getText().toString());
+        
+        // Combine date and time for start_date
+        String startDate = binding.btnStartDate.getText().toString();
+        String executionTime = binding.btnExecutionTime.getText().toString();
+        if (!startDate.equals("Select Date") && !executionTime.equals("Select Time")) {
+            currentTask.setStartDate(startDate + " " + executionTime);
+        }
 
         taskService.updateTask(currentTask, new TaskService.TaskCallback() {
             @Override
@@ -391,9 +411,15 @@ public class TaskCreationFragment extends Fragment {
         task.setDescription(binding.editTextDescription.getText().toString().trim());
         task.setDifficulty(difficulty);
         task.setImportance(importance);
-        task.setExecutionTime(binding.btnExecutionTime.getText().toString());
-        // Default start date for one-off tasks is today
-        task.setStartDate(com.habitrpg.taskmanager.util.DateUtils.getCurrentDateString());
+        // Combine date and time for start_date
+        String startDate = binding.btnStartDate.getText().toString();
+        String executionTime = binding.btnExecutionTime.getText().toString();
+        if (!startDate.equals("Select Date") && !executionTime.equals("Select Time")) {
+            task.setStartDate(startDate + " " + executionTime);
+        } else {
+            // Default to current date and time if not set
+            task.setStartDate(com.habitrpg.taskmanager.util.DateUtils.getCurrentDateTimeString());
+        }
 
         // Handle recurring task
         boolean isRecurring = binding.checkboxRecurring.isChecked();
@@ -455,7 +481,7 @@ public class TaskCreationFragment extends Fragment {
         binding.editTextTaskName.setText("");
         binding.editTextDescription.setText("");
         binding.editTextRecurrenceInterval.setText("");
-        binding.btnStartDate.setText("Select Start Date");
+        binding.btnStartDate.setText("Select Date");
         binding.btnEndDate.setText("Select End Date");
         binding.btnExecutionTime.setText("Select Time");
         binding.checkboxRecurring.setChecked(false);

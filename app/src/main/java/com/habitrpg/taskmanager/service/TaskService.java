@@ -42,9 +42,9 @@ public class TaskService {
         }
         
         task.setUserId(userId);
-        // Ensure start_date is set for single tasks to today if not provided
+        // Ensure start_date is set for single tasks to current date and time if not provided
         if (!task.isRecurring() && (task.getStartDate() == null || task.getStartDate().isEmpty())) {
-            task.setStartDate(DateUtils.getCurrentDateString());
+            task.setStartDate(DateUtils.getCurrentDateTimeString());
         }
         
         validateTaskQuota(task, isValid -> {
@@ -108,28 +108,8 @@ public class TaskService {
     
     private void createRecurringTasks(Task task, TaskCallback callback) {
         try {
-            // First, save the recurring task template
-            taskRepository.insertTask(task, new TaskRepository.TaskCallback() {
-                @Override
-                public void onSuccess(String message) {
-                    // Now create individual instances
-                    createRecurringInstances(task, callback);
-                }
-                
-                @Override
-                public void onError(String error) {
-                    callback.onError("Failed to save recurring task template: " + error);
-                }
-                
-                @Override
-                public void onTaskRetrieved(Task task) {}
-                
-                @Override
-                public void onTasksRetrieved(List<Task> tasks) {}
-                
-                @Override
-                public void onTaskCountRetrieved(int count) {}
-            });
+            // Create only individual instances (no template)
+            createRecurringInstances(task, callback);
             
         } catch (Exception e) {
             callback.onError("Failed to create recurring tasks: " + e.getMessage());
@@ -139,7 +119,13 @@ public class TaskService {
     private void createRecurringInstances(Task templateTask, TaskCallback callback) {
         try {
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
-            java.util.Date startDate = sdf.parse(templateTask.getStartDate());
+            
+            // Parse start date and time from template
+            String[] startDateTimeParts = templateTask.getStartDate().split(" ");
+            String startDateStr = startDateTimeParts[0];
+            String startTimeStr = startDateTimeParts.length > 1 ? startDateTimeParts[1] : "00:00";
+            
+            java.util.Date startDate = sdf.parse(startDateStr);
             java.util.Date endDate = sdf.parse(templateTask.getEndDate());
             
             java.util.Calendar cal = java.util.Calendar.getInstance();
@@ -155,10 +141,16 @@ public class TaskService {
                 recurringTask.setDifficulty(templateTask.getDifficulty());
                 recurringTask.setImportance(templateTask.getImportance());
                 recurringTask.setXpValue(templateTask.getXpValue());
-                recurringTask.setExecutionTime(templateTask.getExecutionTime());
-                recurringTask.setRecurring(false); // Instance is not recurring
-                recurringTask.setCreatedAt(System.currentTimeMillis());
-                recurringTask.setStartDate(sdf.format(cal.getTime()));
+                recurringTask.setRecurring(true); // Instance is from recurring task
+                
+                // Copy recurrence settings from template
+                recurringTask.setRecurrenceInterval(templateTask.getRecurrenceInterval());
+                recurringTask.setRecurrenceUnit(templateTask.getRecurrenceUnit());
+                recurringTask.setEndDate(templateTask.getEndDate());
+                
+                // Combine date and time for this instance
+                String instanceDate = sdf.format(cal.getTime());
+                recurringTask.setStartDate(instanceDate + " " + startTimeStr);
                 
                 String taskDate = sdf.format(cal.getTime());
                 recurringTask.setName(templateTask.getName() + " (" + taskDate + ")");
@@ -229,6 +221,24 @@ public class TaskService {
                     return;
                 }
                 
+                // Validacija: Samo aktivan zadatak može biti označen kao urađen
+                if (!"active".equals(task.getStatus())) {
+                    callback.onError("Only active tasks can be marked as completed");
+                    return;
+                }
+                
+                // Validacija: Ne može se označiti budući zadatak kao urađen
+                if (!isTaskDateValidForCompletion(task)) {
+                    callback.onError("Cannot complete future tasks");
+                    return;
+                }
+                
+                // Validacija: Zadatak se može označiti do 3 dana unazad
+                if (!isWithinCompletionWindow(task)) {
+                    callback.onError("Task can only be completed within 3 days of its scheduled date");
+                    return;
+                }
+                
                 taskRepository.updateTaskStatus(taskId, "completed", new TaskRepository.TaskCallback() {
                     @Override
                     public void onSuccess(String message) {
@@ -285,6 +295,12 @@ public class TaskService {
         String userId = userPreferences.getCurrentUserId();
         if (userId == null) {
             callback.onError("User not logged in");
+            return;
+        }
+        
+        // XP pravila: Pauzirani i otkazani zadaci ne daju XP
+        if ("paused".equals(task.getStatus()) || "cancelled".equals(task.getStatus())) {
+            callback.onSuccess("Task status updated (no XP awarded for " + task.getStatus() + " tasks)");
             return;
         }
         
@@ -543,6 +559,12 @@ public class TaskService {
                 
                 if (!task.getUserId().equals(userId)) {
                     callback.onError("Unauthorized to update this task");
+                    return;
+                }
+                
+                // Validacija statusnih promena prema pravilima
+                if (!isStatusChangeValid(task, status)) {
+                    callback.onError(getStatusChangeErrorMessage(task, status));
                     return;
                 }
                 
@@ -891,76 +913,27 @@ public class TaskService {
                     return;
                 }
                 
-                // Ako je ponavljajući template zadatak
-                if (task.isRecurring()) {
-                    // Briši template i sve buduće instance
-                    String taskBaseName = task.getName();
-                    String currentDate = DateUtils.getCurrentDateString();
+                // Briši zadatak (bilo da je ponavljajući ili obični)
+                taskRepository.deleteTask(taskId, new TaskRepository.TaskCallback() {
+                    @Override
+                    public void onSuccess(String message) {
+                        callback.onSuccess("Task deleted successfully");
+                    }
                     
-                    // Prvo obriši template
-                    taskRepository.deleteTask(taskId, new TaskRepository.TaskCallback() {
-                        @Override
-                        public void onSuccess(String message) {
-                            // Zatim obriši sve buduće instance
-                            taskRepository.deleteFutureRecurringInstances(userId, taskBaseName, currentDate, new TaskRepository.TaskCallback() {
-                                @Override
-                                public void onSuccess(String msg) {
-                                    callback.onSuccess("Recurring task and all future instances deleted");
-                                }
-                                
-                                @Override
-                                public void onError(String error) {
-                                    callback.onError(error);
-                                }
-                                
-                                @Override
-                                public void onTaskRetrieved(Task task) {}
-                                
-                                @Override
-                                public void onTasksRetrieved(List<Task> tasks) {}
-                                
-                                @Override
-                                public void onTaskCountRetrieved(int count) {}
-                            });
-                        }
-                        
-                        @Override
-                        public void onError(String error) {
-                            callback.onError(error);
-                        }
-                        
-                        @Override
-                        public void onTaskRetrieved(Task task) {}
-                        
-                        @Override
-                        public void onTasksRetrieved(List<Task> tasks) {}
-                        
-                        @Override
-                        public void onTaskCountRetrieved(int count) {}
-                    });
-                } else {
-                    // Obični zadatak ili instanca - samo obriši
-                    taskRepository.deleteTask(taskId, new TaskRepository.TaskCallback() {
-                        @Override
-                        public void onSuccess(String message) {
-                            callback.onSuccess("Task deleted successfully");
-                        }
-                        
-                        @Override
-                        public void onError(String error) {
-                            callback.onError(error);
-                        }
-                        
-                        @Override
-                        public void onTaskRetrieved(Task task) {}
-                        
-                        @Override
-                        public void onTasksRetrieved(List<Task> tasks) {}
-                        
-                        @Override
-                        public void onTaskCountRetrieved(int count) {}
-                    });
-                }
+                    @Override
+                    public void onError(String error) {
+                        callback.onError(error);
+                    }
+                    
+                    @Override
+                    public void onTaskRetrieved(Task task) {}
+                    
+                    @Override
+                    public void onTasksRetrieved(List<Task> tasks) {}
+                    
+                    @Override
+                    public void onTaskCountRetrieved(int count) {}
+                });
             }
             
             @Override
@@ -992,5 +965,148 @@ public class TaskService {
     
     private interface QuotaValidationCallback {
         void onValidationResult(boolean isValid);
+    }
+    
+    // Validacija datuma za označavanje zadatka kao urađenog
+    private boolean isTaskDateValidForCompletion(Task task) {
+        if (task.getStartDate() == null) {
+            return true; // Ako nema datum, dozvoli
+        }
+        
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+            java.util.Date taskDateTime = sdf.parse(task.getStartDate());
+            java.util.Date currentDateTime = sdf.parse(DateUtils.getCurrentDateTimeString());
+            
+            return taskDateTime.compareTo(currentDateTime) <= 0; // Zadatak mora biti sada ili u prošlosti
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    // Validacija da li je zadatak u okviru od 3 dana za označavanje kao urađen
+    private boolean isWithinCompletionWindow(Task task) {
+        if (task.getStartDate() == null) {
+            return true; // Ako nema datum, dozvoli
+        }
+        
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+            java.util.Date taskDateTime = sdf.parse(task.getStartDate());
+            java.util.Date currentDateTime = sdf.parse(DateUtils.getCurrentDateTimeString());
+            
+            long diffInMillis = currentDateTime.getTime() - taskDateTime.getTime();
+            long diffInDays = diffInMillis / (1000 * 60 * 60 * 24);
+            
+            return diffInDays <= 3; // Do 3 dana unazad
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    // Validacija da li je statusna promena dozvoljena
+    private boolean isStatusChangeValid(Task task, String newStatus) {
+        String currentStatus = task.getStatus();
+        
+        // Ne može se menjati status završenih, neurađenih i otkazanih zadataka
+        if ("completed".equals(currentStatus) || "incomplete".equals(currentStatus) || "cancelled".equals(currentStatus)) {
+            return false;
+        }
+        
+        // Samo aktivan zadatak može biti označen kao urađen, otkazan ili pauziran
+        if ("active".equals(currentStatus)) {
+            return "completed".equals(newStatus) || "cancelled".equals(newStatus) || 
+                   ("paused".equals(newStatus) && task.isRecurring());
+        }
+        
+        // Pauziran zadatak može samo da se aktivira (samo za ponavljajuće)
+        if ("paused".equals(currentStatus)) {
+            return "active".equals(newStatus) && task.isRecurring();
+        }
+        
+        return false;
+    }
+    
+    // Poruka o grešci za nevažeće statusne promene
+    private String getStatusChangeErrorMessage(Task task, String newStatus) {
+        String currentStatus = task.getStatus();
+        
+        if ("completed".equals(currentStatus) || "incomplete".equals(currentStatus) || "cancelled".equals(currentStatus)) {
+            return "Cannot modify " + getStatusText(currentStatus) + " tasks";
+        }
+        
+        if ("active".equals(currentStatus)) {
+            if ("paused".equals(newStatus) && !task.isRecurring()) {
+                return "Only recurring tasks can be paused";
+            }
+        }
+        
+        if ("paused".equals(currentStatus)) {
+            if (!task.isRecurring()) {
+                return "Only recurring tasks can be paused";
+            }
+        }
+        
+        return "Invalid status change from " + getStatusText(currentStatus) + " to " + getStatusText(newStatus);
+    }
+    
+    // Pomocna metoda za tekst statusa
+    private String getStatusText(String status) {
+        switch (status) {
+            case "active": return "active";
+            case "completed": return "completed";
+            case "incomplete": return "incomplete";
+            case "paused": return "paused";
+            case "cancelled": return "cancelled";
+            default: return status;
+        }
+    }
+    
+    
+    // Automatsko prebacivanje zadataka u neurađen status nakon 3 dana
+    public void checkAndUpdateOverdueTasks() {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) return;
+        
+        taskRepository.getActiveTasksByUserId(userId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {}
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {
+                if (tasks != null) {
+                    for (Task task : tasks) {
+                        if (task.getStartDate() != null && !isWithinCompletionWindow(task)) {
+                            // Zadatak je prošao 3 dana, označi kao neurađen
+                            taskRepository.updateTaskStatus(task.getId(), "incomplete", new TaskRepository.TaskCallback() {
+                                @Override
+                                public void onSuccess(String message) {}
+                                
+                                @Override
+                                public void onError(String error) {}
+                                
+                                @Override
+                                public void onTaskRetrieved(Task task) {}
+                                
+                                @Override
+                                public void onTasksRetrieved(List<Task> tasks) {}
+                                
+                                @Override
+                                public void onTaskCountRetrieved(int count) {}
+                            });
+                        }
+                    }
+                }
+            }
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
     }
 }
