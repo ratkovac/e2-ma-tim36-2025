@@ -3,6 +3,7 @@ package com.habitrpg.taskmanager.presentation.adapters;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -76,9 +77,17 @@ public class GuildChatAdapter extends RecyclerView.Adapter<GuildChatAdapter.Mess
             if (isCurrentUser) {
                 // Current user's message - align right, different background
                 messageContainer.setBackgroundResource(R.drawable.message_bubble_current_user);
+                // Set gravity to end (right) for current user's messages
+                LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) messageContainer.getLayoutParams();
+                params.gravity = android.view.Gravity.END;
+                messageContainer.setLayoutParams(params);
             } else {
                 // Other user's message - align left, different background
                 messageContainer.setBackgroundResource(R.drawable.message_bubble_other_user);
+                // Set gravity to start (left) for other users' messages
+                LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) messageContainer.getLayoutParams();
+                params.gravity = android.view.Gravity.START;
+                messageContainer.setLayoutParams(params);
             }
         }
     }
