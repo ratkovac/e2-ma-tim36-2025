@@ -76,6 +76,16 @@ public class CategoriesFragment extends Fragment {
                 // Show delete dialog on long click
                 showDeleteCategoryDialog(category);
             }
+            
+            @Override
+            public void onEditClick(Category category) {
+                showEditCategoryDialog(category);
+            }
+            
+            @Override
+            public void onDeleteClick(Category category) {
+                showDeleteCategoryDialog(category);
+            }
         });
         
         binding.recyclerViewCategories.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -83,33 +93,6 @@ public class CategoriesFragment extends Fragment {
         showLoading(true);
     }
     
-    private void showEditCategoryDialog(Category category) {
-        EditCategoryDialog dialog = EditCategoryDialog.newInstance(
-            category, 
-            categoryService, 
-            new EditCategoryDialog.OnCategoryUpdatedListener() {
-                @Override
-                public void onCategoryUpdated(Category category) {
-                    loadCategories(); // Reload categories to show updated data
-                }
-            }
-        );
-        dialog.show(getParentFragmentManager(), "EditCategoryDialog");
-    }
-    
-    private void showDeleteCategoryDialog(Category category) {
-        DeleteCategoryDialog dialog = DeleteCategoryDialog.newInstance(
-            category, 
-            categoryService, 
-            new DeleteCategoryDialog.OnCategoryDeletedListener() {
-                @Override
-                public void onCategoryDeleted(Category category) {
-                    loadCategories(); // Reload categories to remove deleted category
-                }
-            }
-        );
-        dialog.show(getParentFragmentManager(), "DeleteCategoryDialog");
-    }
     
     private void loadCategories() {
         categoryService.getAllCategories(new CategoryService.CategoryCallback() {
@@ -162,6 +145,34 @@ public class CategoriesFragment extends Fragment {
     public void onResume() {
         super.onResume();
         loadCategories();
+    }
+    
+    private void showEditCategoryDialog(Category category) {
+        EditCategoryDialog dialog = EditCategoryDialog.newInstance(
+            categoryService, 
+            category,
+            new EditCategoryDialog.OnCategoryUpdatedListener() {
+                @Override
+                public void onCategoryUpdated(Category category) {
+                    loadCategories();
+                }
+            }
+        );
+        dialog.show(getParentFragmentManager(), "EditCategoryDialog");
+    }
+    
+    private void showDeleteCategoryDialog(Category category) {
+        DeleteCategoryDialog dialog = DeleteCategoryDialog.newInstance(
+            categoryService, 
+            category,
+            new DeleteCategoryDialog.OnCategoryDeletedListener() {
+                @Override
+                public void onCategoryDeleted(Category category) {
+                    loadCategories();
+                }
+            }
+        );
+        dialog.show(getParentFragmentManager(), "DeleteCategoryDialog");
     }
     
     @Override
