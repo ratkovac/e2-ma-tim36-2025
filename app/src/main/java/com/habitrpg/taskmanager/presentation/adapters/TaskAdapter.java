@@ -171,10 +171,22 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             tvTaskImportance.setText(getImportanceText(task.getImportance()));
             tvTaskXP.setText("+" + task.getXpValue() + " XP");
             
-            if (task.getExecutionTime() != null && !task.getExecutionTime().isEmpty()) {
-                tvTaskTime.setText("Vreme: " + task.getExecutionTime());
-                tvTaskTime.setVisibility(View.VISIBLE);
+            // Set date and time (combined in start_date)
+            if (task.getStartDate() != null && !task.getStartDate().isEmpty()) {
+                String startDateTime = task.getStartDate();
+                if (startDateTime.contains(" ")) {
+                    String[] parts = startDateTime.split(" ");
+                    tvTaskDate.setText("Datum: " + parts[0]);
+                    tvTaskTime.setText("Vreme: " + parts[1]);
+                    tvTaskDate.setVisibility(View.VISIBLE);
+                    tvTaskTime.setVisibility(View.VISIBLE);
+                } else {
+                    tvTaskDate.setText("Datum: " + startDateTime);
+                    tvTaskTime.setVisibility(View.GONE);
+                    tvTaskDate.setVisibility(View.VISIBLE);
+                }
             } else {
+                tvTaskDate.setVisibility(View.GONE);
                 tvTaskTime.setVisibility(View.GONE);
             }
             
@@ -194,15 +206,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
                 categoryColorIndicator.setBackgroundColor(Color.GRAY);
             }
             
-            // Set date
-            if (task.getStartDate() != null && !task.getStartDate().isEmpty()) {
-                tvTaskDate.setText("Datum: " + task.getStartDate());
-                tvTaskDate.setVisibility(View.VISIBLE);
-            } else {
-                tvTaskDate.setVisibility(View.GONE);
-            }
-            
-            // Show recurring indicator only for template tasks (isRecurring = true)
+            // Show recurring indicator for recurring tasks
             if (task.isRecurring()) {
                 tvRecurringIndicator.setVisibility(View.VISIBLE);
             } else {

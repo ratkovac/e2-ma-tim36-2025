@@ -110,6 +110,11 @@ public class TasksFragment extends Fragment {
             // Navigate to task creation fragment
             Navigation.findNavController(v).navigate(R.id.navigation_task_creation);
         });
+        
+        binding.btnCalendar.setOnClickListener(v -> {
+            // Navigate to calendar fragment
+            Navigation.findNavController(v).navigate(R.id.navigation_calendar);
+        });
     }
 
     private void loadTasks() {
@@ -137,20 +142,19 @@ public class TasksFragment extends Fragment {
                         if (tasks == null || tasks.isEmpty()) {
                             showEmptyState(true);
                         } else {
-                            // Filter to show only current and future tasks (not past tasks)
-                            // Always show recurring templates regardless of date
+                            // Filter to show current/future tasks and paused tasks
                             allTasks.clear();
                             String currentDate = getCurrentDateString();
                             for (Task task : tasks) {
-                                // Always include recurring templates
-                                if (task.isRecurring()) {
-                                    allTasks.add(task);
-                                }
-                                // Include task instances if they are current/future or active/paused
-                                else if (task.getStartDate() != null &&
+                                // Include tasks if they are current/future, active, or paused
+                                if (task.getStartDate() != null &&
                                     (task.getStartDate().compareTo(currentDate) >= 0 ||
                                      "active".equals(task.getStatus()) ||
                                      "paused".equals(task.getStatus()))) {
+                                    allTasks.add(task);
+                                }
+                                // Also include paused tasks regardless of date
+                                else if ("paused".equals(task.getStatus())) {
                                     allTasks.add(task);
                                 }
                             }
@@ -170,13 +174,13 @@ public class TasksFragment extends Fragment {
                 filteredTasks.addAll(allTasks);
                 break;
             case "single":
-                // Single tasks: not recurring (instances are marked as not recurring)
+                // Single tasks: not recurring
                 filteredTasks.addAll(allTasks.stream()
                         .filter(task -> !task.isRecurring())
                         .collect(Collectors.toList()));
                 break;
             case "recurring":
-                // Original recurring task templates only (marked as isRecurring = true)
+                // Recurring task instances: marked as recurring
                 filteredTasks.addAll(allTasks.stream()
                         .filter(task -> task.isRecurring())
                         .collect(Collectors.toList()));
@@ -211,6 +215,8 @@ public class TasksFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        // Check for overdue tasks first
+        taskService.checkAndUpdateOverdueTasks();
         loadTasks();
     }
     

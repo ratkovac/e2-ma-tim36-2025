@@ -14,6 +14,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import com.habitrpg.taskmanager.data.database.entities.Category;
 import com.habitrpg.taskmanager.presentation.adapters.CategoryAdapter;
 import com.habitrpg.taskmanager.presentation.dialogs.CreateCategoryDialog;
+import com.habitrpg.taskmanager.presentation.dialogs.EditCategoryDialog;
+import com.habitrpg.taskmanager.presentation.dialogs.DeleteCategoryDialog;
 import com.habitrpg.taskmanager.service.CategoryService;
 import com.habitrpg.taskmanager.databinding.FragmentCategoriesBinding;
 
@@ -65,18 +67,48 @@ public class CategoriesFragment extends Fragment {
         categoryAdapter = new CategoryAdapter(categories, new CategoryAdapter.OnCategoryClickListener() {
             @Override
             public void onCategoryClick(Category category) {
-                Toast.makeText(getContext(), "Selected: " + category.getName(), Toast.LENGTH_SHORT).show();
+                // Show edit dialog on click
+                showEditCategoryDialog(category);
             }
             
             @Override
             public void onCategoryLongClick(Category category) {
-                Toast.makeText(getContext(), "Long click: " + category.getName(), Toast.LENGTH_SHORT).show();
+                // Show delete dialog on long click
+                showDeleteCategoryDialog(category);
             }
         });
         
         binding.recyclerViewCategories.setLayoutManager(new LinearLayoutManager(getContext()));
         binding.recyclerViewCategories.setAdapter(categoryAdapter);
         showLoading(true);
+    }
+    
+    private void showEditCategoryDialog(Category category) {
+        EditCategoryDialog dialog = EditCategoryDialog.newInstance(
+            category, 
+            categoryService, 
+            new EditCategoryDialog.OnCategoryUpdatedListener() {
+                @Override
+                public void onCategoryUpdated(Category category) {
+                    loadCategories(); // Reload categories to show updated data
+                }
+            }
+        );
+        dialog.show(getParentFragmentManager(), "EditCategoryDialog");
+    }
+    
+    private void showDeleteCategoryDialog(Category category) {
+        DeleteCategoryDialog dialog = DeleteCategoryDialog.newInstance(
+            category, 
+            categoryService, 
+            new DeleteCategoryDialog.OnCategoryDeletedListener() {
+                @Override
+                public void onCategoryDeleted(Category category) {
+                    loadCategories(); // Reload categories to remove deleted category
+                }
+            }
+        );
+        dialog.show(getParentFragmentManager(), "DeleteCategoryDialog");
     }
     
     private void loadCategories() {

@@ -42,19 +42,13 @@ public class Task {
     private String recurrenceUnit; // 'day', 'week'
 
     @ColumnInfo(name = "start_date")
-    private String startDate; // Format: YYYY-MM-DD
+    private String startDate; // Format: YYYY-MM-DD HH:MM
 
     @ColumnInfo(name = "end_date")
     private String endDate; // Format: YYYY-MM-DD
 
-    @ColumnInfo(name = "execution_time")
-    private String executionTime; // Format: HH:MM
-
     @NonNull
     private String status = "active"; // 'active', 'completed', 'incomplete', 'paused', 'cancelled'
-
-    @ColumnInfo(name = "created_at")
-    private long createdAt;
 
     public Task() {}
 
@@ -67,7 +61,6 @@ public class Task {
         this.difficulty = difficulty;
         this.importance = importance;
         this.xpValue = xpValue;
-        this.createdAt = System.currentTimeMillis();
     }
 
     // Getters and Setters
@@ -179,14 +172,6 @@ public class Task {
         this.endDate = endDate;
     }
 
-    public String getExecutionTime() {
-        return executionTime;
-    }
-
-    public void setExecutionTime(String executionTime) {
-        this.executionTime = executionTime;
-    }
-
     @NonNull
     public String getStatus() {
         return status;
@@ -194,13 +179,5 @@ public class Task {
 
     public void setStatus(@NonNull String status) {
         this.status = status;
-    }
-
-    public long getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(long createdAt) {
-        this.createdAt = createdAt;
     }
 }

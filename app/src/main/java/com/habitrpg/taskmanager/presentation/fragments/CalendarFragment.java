@@ -134,15 +134,29 @@ public class CalendarFragment extends Fragment {
         tasksForSelectedDate.clear();
         
         if (allTasks != null) {
-            // Include only task instances (not templates) that match the selected date
-            // Exclude recurring templates (isRecurring = true) as they don't have specific dates
+            // Include all tasks that match the selected date
             List<Task> filtered = allTasks.stream()
-                    .filter(task -> !task.isRecurring() && // Exclude templates
-                            task.getStartDate() != null && 
-                            task.getStartDate().equals(selectedDate))
+                    .filter(task -> task.getStartDate() != null && 
+                            task.getStartDate().startsWith(selectedDate))
                     .sorted((t1, t2) -> {
-                        String time1 = t1.getExecutionTime() != null ? t1.getExecutionTime() : "23:59";
-                        String time2 = t2.getExecutionTime() != null ? t2.getExecutionTime() : "23:59";
+                        String time1 = "23:59";
+                        String time2 = "23:59";
+                        
+                        // Extract time from combined start_date
+                        if (t1.getStartDate() != null && t1.getStartDate().contains(" ")) {
+                            String[] parts1 = t1.getStartDate().split(" ");
+                            if (parts1.length > 1) {
+                                time1 = parts1[1];
+                            }
+                        }
+                        
+                        if (t2.getStartDate() != null && t2.getStartDate().contains(" ")) {
+                            String[] parts2 = t2.getStartDate().split(" ");
+                            if (parts2.length > 1) {
+                                time2 = parts2[1];
+                            }
+                        }
+                        
                         return time1.compareTo(time2);
                     })
                     .collect(Collectors.toList());
