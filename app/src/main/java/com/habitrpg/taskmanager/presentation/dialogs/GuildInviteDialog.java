@@ -128,16 +128,24 @@ public class GuildInviteDialog extends DialogFragment {
             guildService.sendGuildInvite(guildId, friend.getFriendUserId(), new GuildService.GuildCallback() {
                 @Override
                 public void onSuccess(String message, com.habitrpg.taskmanager.data.database.entities.Guild guild) {
-                    requireActivity().runOnUiThread(() -> {
-                        Toast.makeText(requireContext(), "Invite sent to " + friend.getFriendUsername(), Toast.LENGTH_SHORT).show();
-                    });
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            if (isAdded() && getContext() != null) {
+                                Toast.makeText(getContext(), "Invite sent to " + friend.getFriendUsername(), Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
                 }
                 
                 @Override
                 public void onError(String error) {
-                    requireActivity().runOnUiThread(() -> {
-                        Toast.makeText(requireContext(), "Failed to send invite to " + friend.getFriendUsername() + ": " + error, Toast.LENGTH_SHORT).show();
-                    });
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            if (isAdded() && getContext() != null) {
+                                Toast.makeText(getContext(), "Failed to send invite to " + friend.getFriendUsername() + ": " + error, Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
                 }
             });
         }

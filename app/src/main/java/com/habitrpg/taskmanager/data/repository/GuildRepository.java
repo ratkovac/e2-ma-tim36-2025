@@ -8,6 +8,7 @@ import com.habitrpg.taskmanager.data.database.dao.UserDao;
 import com.habitrpg.taskmanager.data.database.entities.Guild;
 import com.habitrpg.taskmanager.data.database.entities.GuildInvite;
 import com.habitrpg.taskmanager.data.database.entities.GuildMember;
+import com.habitrpg.taskmanager.data.database.entities.GuildMessage;
 import com.habitrpg.taskmanager.data.database.entities.User;
 
 import java.util.List;
@@ -394,6 +395,63 @@ public class GuildRepository {
     
     public interface GuildInviteListCallback {
         void onSuccess(String message, List<GuildInvite> invites);
+        void onError(String error);
+    }
+    
+    public void getCurrentGuild(String userId, GuildCallback callback) {
+        ensureExecutorActive();
+        executor.execute(() -> {
+            try {
+                GuildMember member = guildDao.getGuildMemberByUserId(userId);
+                if (member != null) {
+                    Guild guild = guildDao.getGuildById(member.getGuildId());
+                    callback.onSuccess("Guild loaded successfully", guild);
+                } else {
+                    callback.onError("User is not in any guild");
+                }
+            } catch (Exception e) {
+                callback.onError("Failed to load guild: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void getGuildMessages(String guildId, GuildMessageCallback callback) {
+        ensureExecutorActive();
+        executor.execute(() -> {
+            try {
+                List<GuildMessage> messages = guildDao.getGuildMessages(guildId);
+                callback.onSuccess("Messages loaded successfully", messages);
+            } catch (Exception e) {
+                callback.onError("Failed to load messages: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void sendGuildMessage(String guildId, String userId, String username, String messageText, GuildMessageCallback callback) {
+        ensureExecutorActive();
+        executor.execute(() -> {
+            try {
+                GuildMessage message = new GuildMessage();
+                message.setGuildId(guildId);
+                message.setUserId(userId);
+                message.setUsername(username);
+                message.setMessageText(messageText);
+                message.setTimestamp(System.currentTimeMillis());
+                message.setSystemMessage(false);
+                
+                guildDao.insertGuildMessage(message);
+                
+                // Return updated message list
+                List<GuildMessage> messages = guildDao.getGuildMessages(guildId);
+                callback.onSuccess("Message sent successfully", messages);
+            } catch (Exception e) {
+                callback.onError("Failed to send message: " + e.getMessage());
+            }
+        });
+    }
+    
+    public interface GuildMessageCallback {
+        void onSuccess(String message, List<GuildMessage> messages);
         void onError(String error);
     }
 }

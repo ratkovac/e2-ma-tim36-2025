@@ -18,14 +18,15 @@ import com.habitrpg.taskmanager.data.database.entities.FriendRequest;
 import com.habitrpg.taskmanager.data.database.entities.Guild;
 import com.habitrpg.taskmanager.data.database.entities.GuildInvite;
 import com.habitrpg.taskmanager.data.database.entities.GuildMember;
+import com.habitrpg.taskmanager.data.database.entities.GuildMessage;
 import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.data.database.entities.TaskCompletion;
 import com.habitrpg.taskmanager.data.database.entities.User;
 import com.habitrpg.taskmanager.data.database.entities.UserStatistics;
 
 @Database(
-    entities = {User.class, Category.class, Task.class, TaskCompletion.class, UserStatistics.class, 
-                Friend.class, FriendRequest.class, Guild.class, GuildMember.class, GuildInvite.class},
+        entities = {User.class, Category.class, Task.class, TaskCompletion.class, UserStatistics.class, 
+                    Friend.class, FriendRequest.class, Guild.class, GuildMember.class, GuildInvite.class, GuildMessage.class},
     version = 5,
     exportSchema = false
 )

@@ -59,4 +59,9 @@
         android:name="com.habitrpg.taskmanager.presentation.fragments.CalendarFragment"
         android:label="Calendar" />
 
+    <fragment
+        android:id="@+id/navigation_guild_chat"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.GuildChatFragment"
+        android:label="Guild Chat" />
+
 </navigation>

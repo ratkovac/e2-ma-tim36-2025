@@ -5,6 +5,7 @@ import android.content.Context;
 import com.habitrpg.taskmanager.data.database.entities.Guild;
 import com.habitrpg.taskmanager.data.database.entities.GuildInvite;
 import com.habitrpg.taskmanager.data.database.entities.GuildMember;
+import com.habitrpg.taskmanager.data.database.entities.GuildMessage;
 import com.habitrpg.taskmanager.data.repository.GuildRepository;
 import com.habitrpg.taskmanager.data.repository.UserRepository;
 import com.habitrpg.taskmanager.service.UserPreferences;
@@ -325,6 +326,83 @@ public class GuildService {
     
     public interface GuildInviteListCallback {
         void onSuccess(String message, List<GuildInvite> invites);
+        void onError(String error);
+    }
+    
+    public void getCurrentGuild(GuildCallback callback) {
+        String currentUserId = userPreferences.getCurrentUserId();
+        if (currentUserId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        guildRepository.getCurrentGuild(currentUserId, new GuildRepository.GuildCallback() {
+            @Override
+            public void onSuccess(String message, Guild guild) {
+                callback.onSuccess(message, guild);
+            }
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+        });
+    }
+    
+    public void getGuildMessages(String guildId, GuildMessageCallback callback) {
+        guildRepository.getGuildMessages(guildId, new GuildRepository.GuildMessageCallback() {
+            @Override
+            public void onSuccess(String message, List<GuildMessage> messages) {
+                callback.onSuccess(message, messages);
+            }
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+        });
+    }
+    
+    public void sendGuildMessage(String guildId, String messageText, GuildMessageCallback callback) {
+        String currentUserId = userPreferences.getCurrentUserId();
+        if (currentUserId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        // Get current user info
+        userRepository.getUserById(currentUserId, new UserRepository.UserCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to get user info: " + error);
+            }
+            
+            @Override
+            public void onUserRetrieved(com.habitrpg.taskmanager.data.database.entities.User user) {
+                if (user != null) {
+                    guildRepository.sendGuildMessage(guildId, currentUserId, user.getUsername(), messageText, new GuildRepository.GuildMessageCallback() {
+                        @Override
+                        public void onSuccess(String message, List<GuildMessage> messages) {
+                            callback.onSuccess(message, messages);
+                        }
+                        
+                        @Override
+                        public void onError(String error) {
+                            callback.onError(error);
+                        }
+                    });
+                } else {
+                    callback.onError("User not found");
+                }
+            }
+        });
+    }
+    
+    public interface GuildMessageCallback {
+        void onSuccess(String message, List<GuildMessage> messages);
         void onError(String error);
     }
 }
