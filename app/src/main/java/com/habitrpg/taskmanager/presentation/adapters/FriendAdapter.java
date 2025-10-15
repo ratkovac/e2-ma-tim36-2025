@@ -100,3 +100,4 @@ public class FriendAdapter extends RecyclerView.Adapter<FriendAdapter.FriendView
     }
 }
 
+

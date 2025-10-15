@@ -105,3 +105,4 @@ public class CreateGuildDialog extends DialogFragment {
         });
     }
 }
+
