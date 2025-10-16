@@ -350,6 +350,8 @@ public class TaskService {
                                 if (ppEarned > 0) {
                                     resultMessage += "\n+" + ppEarned + " Power Points earned!";
                                 }
+                                // Trigger boss fight for level up
+                                callback.onLevelUp(newLevel, ppEarned);
                             }
                             callback.onSuccess(resultMessage);
                         }
@@ -957,6 +959,9 @@ public class TaskService {
         void onSuccess(String message);
         void onError(String error);
         void onTasksRetrieved(List<Task> tasks);
+        default void onLevelUp(int newLevel, int ppEarned) {
+            // Default implementation - can be overridden
+        }
     }
     
     public interface TaskListCallback {
