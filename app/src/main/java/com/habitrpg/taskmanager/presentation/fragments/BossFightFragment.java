@@ -44,6 +44,7 @@ public class BossFightFragment extends Fragment {
     private User currentUser;
     private int remainingAttacks = 5;
     private int successChance = 0;
+    private static final int MAX_ATTACKS = 5;
 
     @Nullable
     @Override
@@ -199,13 +200,62 @@ public class BossFightFragment extends Fragment {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
-                        updateUI();
                         
                         // Check if boss is defeated or attacks exhausted
-                        if (currentBoss.isDefeated()) {
-                            showVictoryMessage();
+                        if (currentBoss != null && currentBoss.isDefeated()) {
+                            // Boss defeated - end fight with victory
+                            bossService.endBossFight(currentBoss, MAX_ATTACKS - remainingAttacks, new BossService.BossCallback() {
+                                @Override
+                                public void onSuccess(String message) {}
+                                
+                                @Override
+                                public void onError(String error) {
+                                    if (getActivity() != null) {
+                                        getActivity().runOnUiThread(() -> {
+                                            Toast.makeText(getContext(), "Error ending fight: " + error, Toast.LENGTH_SHORT).show();
+                                        });
+                                    }
+                                }
+                                
+                                @Override
+                                public void onBossRetrieved(Boss boss) {}
+                                
+                                @Override
+                                public void onBossFightResult(BossService.BossFightResult result) {
+                                    if (getActivity() != null) {
+                                        getActivity().runOnUiThread(() -> {
+                                            showBossFightResult(result);
+                                        });
+                                    }
+                                }
+                            });
                         } else if (remainingAttacks <= 0) {
-                            showDefeatMessage();
+                            // Attacks exhausted - end fight
+                            bossService.endBossFight(currentBoss, MAX_ATTACKS, new BossService.BossCallback() {
+                                @Override
+                                public void onSuccess(String message) {}
+                                
+                                @Override
+                                public void onError(String error) {
+                                    if (getActivity() != null) {
+                                        getActivity().runOnUiThread(() -> {
+                                            Toast.makeText(getContext(), "Error ending fight: " + error, Toast.LENGTH_SHORT).show();
+                                        });
+                                    }
+                                }
+                                
+                                @Override
+                                public void onBossRetrieved(Boss boss) {}
+                                
+                                @Override
+                                public void onBossFightResult(BossService.BossFightResult result) {
+                                    if (getActivity() != null) {
+                                        getActivity().runOnUiThread(() -> {
+                                            showBossFightResult(result);
+                                        });
+                                    }
+                                }
+                            });
                         }
                     });
                 }
@@ -221,7 +271,14 @@ public class BossFightFragment extends Fragment {
             }
             
             @Override
-            public void onBossRetrieved(Boss boss) {}
+            public void onBossRetrieved(Boss boss) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        currentBoss = boss;
+                        updateUI();
+                    });
+                }
+            }
             
             @Override
             public void onBossFightResult(BossService.BossFightResult result) {
@@ -246,20 +303,37 @@ public class BossFightFragment extends Fragment {
     
     private void showBossFightResult(BossService.BossFightResult result) {
         String message = "Boss Fight Result:\n";
+        
         if (result.isVictory()) {
-            message += "Victory! You earned " + result.getCoinsEarned() + " coins!";
+            message += "🎉 POBEDA! 🎉\n";
+            message += "Osvojili ste " + result.getCoinsEarned() + " novčića!\n";
             if (result.isEquipmentDropped()) {
-                message += "\nEquipment dropped: " + result.getEquipmentEarned();
+                message += "Oprema: " + result.getEquipmentEarned() + " ✨";
+            }
+        } else if (result.isPartialVictory()) {
+            message += "⚔️ Delimična pobeda! ⚔️\n";
+            message += "Osvojili ste " + result.getCoinsEarned() + " novčića!\n";
+            message += "Naneli ste " + String.format("%.1f", result.getHpDamagePercentage()) + "% štete\n";
+            if (result.isEquipmentDropped()) {
+                message += "Oprema: " + result.getEquipmentEarned() + " ✨";
             }
         } else {
-            message += "Defeat! Better luck next time.";
+            message += "💀 Poraz! 💀\n";
+            message += "Naneli ste " + String.format("%.1f", result.getHpDamagePercentage()) + "% štete\n";
+            message += "Bolje sreće sledeći put!";
         }
         
         Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
         
         // Disable attack button
         attackButton.setEnabled(false);
-        attackButton.setText(result.isVictory() ? "POBEDA!" : "PORAZ!");
+        if (result.isVictory()) {
+            attackButton.setText("🎉 POBEDA!");
+        } else if (result.isPartialVictory()) {
+            attackButton.setText("⚔️ DELIMIČNA POBEDA");
+        } else {
+            attackButton.setText("💀 PORAZ");
+        }
     }
 
 }
