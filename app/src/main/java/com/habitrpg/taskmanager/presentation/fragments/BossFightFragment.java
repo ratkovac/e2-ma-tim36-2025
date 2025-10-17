@@ -1,10 +1,22 @@
 package com.habitrpg.taskmanager.presentation.fragments;
 
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
+import android.app.Dialog;
+import android.content.Context;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -38,7 +50,17 @@ public class BossFightFragment extends Fragment {
     // Services
     private BossService bossService;
     private AuthService authService;
-    
+
+    private MediaPlayer hitSoundPlayer;
+
+    // Shake sensor
+    private SensorManager sensorManager;
+    private Sensor accelerometer;
+    private SensorEventListener shakeListener;
+    private long lastShakeTime = 0;
+    private static final int SHAKE_THRESHOLD = 15;
+    private static final int SHAKE_TIMEOUT = 1000;
+
     // Boss Fight Data
     private Boss currentBoss;
     private User currentUser;
@@ -62,6 +84,7 @@ public class BossFightFragment extends Fragment {
         
         initializeViews(view);
         setupClickListeners();
+        initializeShakeSensor();
         loadBossFightData();
     }
 
@@ -77,6 +100,7 @@ public class BossFightFragment extends Fragment {
         successChanceText = view.findViewById(R.id.success_chance_text);
         attackButton = view.findViewById(R.id.attack_button);
         shakeInstruction = view.findViewById(R.id.shake_instruction);
+        hitSoundPlayer = MediaPlayer.create(requireContext(), R.raw.hit);
     }
 
     private void setupClickListeners() {
@@ -84,6 +108,38 @@ public class BossFightFragment extends Fragment {
             // TODO: Implement attack logic
             performAttack();
         });
+    }
+    
+    private void initializeShakeSensor() {
+        sensorManager = (SensorManager) requireContext().getSystemService(Context.SENSOR_SERVICE);
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        
+        shakeListener = new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+                float x = event.values[0];
+                float y = event.values[1];
+                float z = event.values[2];
+                
+                float acceleration = (float) Math.sqrt(x * x + y * y + z * z) - SensorManager.GRAVITY_EARTH;
+                
+                if (Math.abs(acceleration) > SHAKE_THRESHOLD) {
+                    long currentTime = System.currentTimeMillis();
+                    if (currentTime - lastShakeTime > SHAKE_TIMEOUT) {
+                        lastShakeTime = currentTime;
+                        onShakeDetected();
+                    }
+                }
+            }
+            
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+        };
+    }
+    
+    private void onShakeDetected() {
+        // This will be called when shake is detected
+        // We'll use this in the treasure dialog
     }
 
     private void loadBossFightData() {
@@ -201,6 +257,9 @@ public class BossFightFragment extends Fragment {
                     getActivity().runOnUiThread(() -> {
                         Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
                         
+                        // Play hit sound when attack is successful
+                        playHitSound();
+
                         // Check if boss is defeated or attacks exhausted
                         if (currentBoss != null && currentBoss.isDefeated()) {
                             // Boss defeated - end fight with victory
@@ -301,29 +360,76 @@ public class BossFightFragment extends Fragment {
         attackButton.setEnabled(false);
     }
     
-    private void showBossFightResult(BossService.BossFightResult result) {
-        String message = "Boss Fight Result:\n";
-        
-        if (result.isVictory()) {
-            message += "🎉 POBEDA! 🎉\n";
-            message += "Osvojili ste " + result.getCoinsEarned() + " novčića!\n";
-            if (result.isEquipmentDropped()) {
-                message += "Oprema: " + result.getEquipmentEarned() + " ✨";
+    private void playHitSound() {
+        if (hitSoundPlayer != null) {
+            try {
+                // Reset to beginning if already playing
+                hitSoundPlayer.seekTo(0);
+                hitSoundPlayer.start();
+            } catch (Exception e) {
+                // Log error but don't crash the app
+                e.printStackTrace();
             }
-        } else if (result.isPartialVictory()) {
-            message += "⚔️ Delimična pobeda! ⚔️\n";
-            message += "Osvojili ste " + result.getCoinsEarned() + " novčića!\n";
-            message += "Naneli ste " + String.format("%.1f", result.getHpDamagePercentage()) + "% štete\n";
-            if (result.isEquipmentDropped()) {
-                message += "Oprema: " + result.getEquipmentEarned() + " ✨";
-            }
-        } else {
-            message += "💀 Poraz! 💀\n";
-            message += "Naneli ste " + String.format("%.1f", result.getHpDamagePercentage()) + "% štete\n";
-            message += "Bolje sreće sledeći put!";
         }
         
-        Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
+        // Animate boss hit effect
+        animateBossHit();
+    }
+    
+    private void animateBossHit() {
+        if (bossImage == null) return;
+        
+        // Create a red tint effect using ColorMatrix
+        ColorMatrix colorMatrix = new ColorMatrix();
+        colorMatrix.setSaturation(0); // Make it grayscale first
+        colorMatrix.set(new float[]{
+            1.5f, 0f, 0f, 0f, 50f,  // Red channel increased
+            0f, 0.3f, 0f, 0f, 0f,   // Green channel reduced
+            0f, 0f, 0.3f, 0f, 0f,   // Blue channel reduced
+            0f, 0f, 0f, 1f, 0f      // Alpha unchanged
+        });
+        
+        ColorMatrixColorFilter redFilter = new ColorMatrixColorFilter(colorMatrix);
+        
+        // Create animation that fades the red effect in and out
+        ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f, 0f);
+        animator.setDuration(300); // 300ms animation
+        
+        animator.addUpdateListener(animation -> {
+            float progress = (Float) animation.getAnimatedValue();
+            
+            if (progress > 0) {
+                // Apply red tint based on progress
+                ColorMatrix currentMatrix = new ColorMatrix();
+                currentMatrix.setSaturation(1f - progress * 0.7f); // Reduce saturation
+                
+                // Add red tint
+                float redIntensity = progress * 0.8f;
+                currentMatrix.set(new float[]{
+                    1f + redIntensity, 0f, 0f, 0f, redIntensity * 50f,
+                    0f, 1f - redIntensity * 0.3f, 0f, 0f, 0f,
+                    0f, 0f, 1f - redIntensity * 0.3f, 0f, 0f,
+                    0f, 0f, 0f, 1f, 0f
+                });
+                
+                bossImage.setColorFilter(new ColorMatrixColorFilter(currentMatrix));
+            } else {
+                // Remove color filter when animation ends
+                bossImage.clearColorFilter();
+            }
+        });
+        
+        animator.start();
+    }
+
+    private void showBossFightResult(BossService.BossFightResult result) {
+        // Show treasure dialog for victory or partial victory
+        if (result.isVictory() || result.isPartialVictory()) {
+            showTreasureDialog(result);
+        } else {
+            // Show defeat dialog
+            showDefeatDialog(result);
+        }
         
         // Disable attack button
         attackButton.setEnabled(false);
@@ -335,5 +441,179 @@ public class BossFightFragment extends Fragment {
             attackButton.setText("💀 PORAZ");
         }
     }
+    
+    private void showTreasureDialog(BossService.BossFightResult result) {
+        Dialog dialog = new Dialog(requireContext());
+        dialog.setContentView(R.layout.dialog_treasure);
+        dialog.setCancelable(false);
+        
+        ImageView treasureChest = dialog.findViewById(R.id.treasure_chest);
+        TextView coinsText = dialog.findViewById(R.id.coins_reward);
+        TextView equipmentText = dialog.findViewById(R.id.equipment_reward);
+        MaterialButton shakeButton = dialog.findViewById(R.id.shake_button);
+        MaterialButton exitButton = dialog.findViewById(R.id.exit_button);
+        TextView shakeInstruction = dialog.findViewById(R.id.shake_instruction);
+        
+        // Set initial closed chest image
+        treasureChest.setImageResource(R.drawable.treasure);
+        
+        // Set rewards text
+        coinsText.setText("+" + result.getCoinsEarned() + " novčića");
+        if (result.isEquipmentDropped()) {
+            equipmentText.setText("Oprema: " + result.getEquipmentEarned() + " ✨");
+            equipmentText.setVisibility(View.VISIBLE);
+        } else {
+            equipmentText.setVisibility(View.GONE);
+        }
+        
+        // Hide rewards initially
+        coinsText.setVisibility(View.GONE);
+        equipmentText.setVisibility(View.GONE);
+        
+        // Shake button for testing on emulator
+        shakeButton.setOnClickListener(v -> openTreasureChest(treasureChest, coinsText, equipmentText, exitButton, dialog));
+        
+        // Exit button to go back to tasks
+        exitButton.setOnClickListener(v -> {
+            dialog.dismiss();
+            navigateToTasks();
+        });
+        
+        // Start listening for shake
+        sensorManager.registerListener(shakeListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        
+        // Store dialog reference for shake detection
+        final Dialog finalDialog = dialog;
+        final ImageView finalTreasureChest = treasureChest;
+        final TextView finalCoinsText = coinsText;
+        final TextView finalEquipmentText = equipmentText;
+        final MaterialButton finalExitButton = exitButton;
+        
+        // Override onShakeDetected for this dialog
+        shakeListener = new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+                float x = event.values[0];
+                float y = event.values[1];
+                float z = event.values[2];
+                
+                float acceleration = (float) Math.sqrt(x * x + y * y + z * z) - SensorManager.GRAVITY_EARTH;
+                
+                if (Math.abs(acceleration) > SHAKE_THRESHOLD) {
+                    long currentTime = System.currentTimeMillis();
+                    if (currentTime - lastShakeTime > SHAKE_TIMEOUT) {
+                        lastShakeTime = currentTime;
+                        openTreasureChest(finalTreasureChest, finalCoinsText, finalEquipmentText, finalExitButton, finalDialog);
+                    }
+                }
+            }
+            
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+        };
+        
+        dialog.show();
+    }
+    
+    private void openTreasureChest(ImageView treasureChest, TextView coinsText, TextView equipmentText, MaterialButton exitButton, Dialog dialog) {
+        // Stop listening for shake
+        sensorManager.unregisterListener(shakeListener);
+        
+        // Change to open chest image
+        treasureChest.setImageResource(R.drawable.treasurechest);
+        
+        // Show rewards with animation
+        coinsText.setVisibility(View.VISIBLE);
+        if (equipmentText.getVisibility() == View.VISIBLE) {
+            equipmentText.setVisibility(View.VISIBLE);
+        }
+        
+        // Show exit button
+        exitButton.setVisibility(View.VISIBLE);
+        
+        // Animate the rewards appearing
+        ObjectAnimator coinsAnimator = ObjectAnimator.ofFloat(coinsText, "alpha", 0f, 1f);
+        coinsAnimator.setDuration(500);
+        coinsAnimator.start();
+        
+        if (equipmentText.getVisibility() == View.VISIBLE) {
+            ObjectAnimator equipmentAnimator = ObjectAnimator.ofFloat(equipmentText, "alpha", 0f, 1f);
+            equipmentAnimator.setDuration(500);
+            equipmentAnimator.setStartDelay(200);
+            equipmentAnimator.start();
+        }
+        
+        // Animate exit button appearing
+        ObjectAnimator exitButtonAnimator = ObjectAnimator.ofFloat(exitButton, "alpha", 0f, 1f);
+        exitButtonAnimator.setDuration(500);
+        exitButtonAnimator.setStartDelay(400);
+        exitButtonAnimator.start();
+    }
+    
+    private void showDefeatDialog(BossService.BossFightResult result) {
+        Dialog dialog = new Dialog(requireContext());
+        dialog.setContentView(R.layout.dialog_defeat);
+        dialog.setCancelable(false);
+        
+        TextView defeatMessage = dialog.findViewById(R.id.defeat_message);
+        LinearLayout rewardsContainer = dialog.findViewById(R.id.rewards_container);
+        TextView partialCoinsReward = dialog.findViewById(R.id.partial_coins_reward);
+        TextView partialEquipmentReward = dialog.findViewById(R.id.partial_equipment_reward);
+        TextView damageInfo = dialog.findViewById(R.id.damage_info);
+        MaterialButton backButton = dialog.findViewById(R.id.back_button);
+        
+        // Set defeat message
+        defeatMessage.setText("Unfortunately, you have lost!");
+        
+        // Set damage info
+        damageInfo.setText("You dealt " + String.format("%.1f", result.getHpDamagePercentage()) + "% damage to the boss.\nBetter luck next time!");
+        
+        // Check if user gets partial rewards (50% or more damage)
+        if (result.getHpDamagePercentage() >= 50.0f) {
+            // Show partial rewards
+            rewardsContainer.setVisibility(View.VISIBLE);
+            partialCoinsReward.setText("+" + result.getCoinsEarned() + " coins");
+            
+            if (result.isEquipmentDropped()) {
+                partialEquipmentReward.setText("Equipment: " + result.getEquipmentEarned() + " ✨");
+                partialEquipmentReward.setVisibility(View.VISIBLE);
+            } else {
+                partialEquipmentReward.setVisibility(View.GONE);
+            }
+        } else {
+            // No rewards for less than 50% damage
+            rewardsContainer.setVisibility(View.GONE);
+        }
+        
+        // Back button to return to tasks
+        backButton.setOnClickListener(v -> {
+            dialog.dismiss();
+            navigateToTasks();
+        });
+        
+        dialog.show();
+    }
+    
+    private void navigateToTasks() {
+        // Navigate back to the main tasks fragment
+        if (getActivity() != null && getParentFragmentManager() != null) {
+            // Pop the current fragment from the back stack
+            getParentFragmentManager().popBackStack();
+        }
+    }
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (hitSoundPlayer != null) {
+            hitSoundPlayer.release();
+            hitSoundPlayer = null;
+        }
+        
+        // Unregister shake sensor
+        if (sensorManager != null && shakeListener != null) {
+            sensorManager.unregisterListener(shakeListener);
+        }
+    }
+
 
 }
