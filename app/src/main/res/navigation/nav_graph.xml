@@ -65,6 +65,16 @@
         android:label="Guild Chat" />
 
     <fragment
+        android:id="@+id/navigation_shop"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.ShopFragment"
+        android:label="Shop" />
+
+    <fragment
+        android:id="@+id/navigation_equipment"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.EquipmentDisplayFragment"
+        android:label="Equipment" />
+
+    <fragment
         android:id="@+id/navigation_boss_fight"
         android:name="com.habitrpg.taskmanager.presentation.fragments.BossFightFragment"
         android:label="Boss Fight" />

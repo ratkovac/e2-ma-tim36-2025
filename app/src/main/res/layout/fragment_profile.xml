@@ -240,6 +240,15 @@
             android:textSize="16sp"
             style="@style/Widget.Material3.Button.OutlinedButton" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnShop"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginBottom="8dp"
+            android:text="Shop"
+            android:textSize="16sp"
+            style="@style/Widget.Material3.Button.OutlinedButton" />
+
         <!-- QR Code Display -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"

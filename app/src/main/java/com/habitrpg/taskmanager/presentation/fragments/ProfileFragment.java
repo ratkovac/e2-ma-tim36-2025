@@ -54,6 +54,7 @@ public class ProfileFragment extends Fragment {
         binding.btnViewEquipment.setOnClickListener(v -> showEquipment());
         binding.btnLevelProgress.setOnClickListener(v -> showLevelProgress());
         binding.btnStatistics.setOnClickListener(v -> showStatistics());
+        binding.btnShop.setOnClickListener(v -> showShop());
     }
 
     private void showChangePasswordDialog() {
@@ -92,7 +93,7 @@ public class ProfileFragment extends Fragment {
     }
 
     private void showEquipment() {
-        Toast.makeText(getContext(), "Equipment feature coming soon!", Toast.LENGTH_SHORT).show();
+        Navigation.findNavController(requireView()).navigate(R.id.navigation_equipment);
     }
 
     private void showLevelProgress() {
@@ -210,6 +211,10 @@ public class ProfileFragment extends Fragment {
         if (getActivity() != null) {
             getActivity().finish();
         }
+    }
+
+    private void showShop() {
+        Navigation.findNavController(requireView()).navigate(R.id.navigation_shop);
     }
 
     private void showLoading(boolean show) {
