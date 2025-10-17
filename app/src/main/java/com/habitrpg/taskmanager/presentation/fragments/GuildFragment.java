@@ -44,6 +44,7 @@ public class GuildFragment extends Fragment {
     private Button inviteFriendsButton;
     private Button leaveGuildButton;
     private Button disbandGuildButton;
+    private Button btnGuildChat;
     private RecyclerView membersRecyclerView;
     private RecyclerView invitesRecyclerView;
     private TextView noGuildText;
@@ -86,6 +87,7 @@ public class GuildFragment extends Fragment {
         inviteFriendsButton = view.findViewById(R.id.invite_friends_button);
         leaveGuildButton = view.findViewById(R.id.leave_guild_button);
         disbandGuildButton = view.findViewById(R.id.disband_guild_button);
+        btnGuildChat = view.findViewById(R.id.btnGuildChat);
         membersRecyclerView = view.findViewById(R.id.members_recycler_view);
         invitesRecyclerView = view.findViewById(R.id.invites_recycler_view);
         noGuildText = view.findViewById(R.id.no_guild_text);
@@ -109,6 +111,7 @@ public class GuildFragment extends Fragment {
         inviteFriendsButton.setOnClickListener(v -> showInviteFriendsDialog());
         leaveGuildButton.setOnClickListener(v -> leaveGuild());
         disbandGuildButton.setOnClickListener(v -> disbandGuild());
+        btnGuildChat.setOnClickListener(v -> navigateToGuildChat());
     }
     
     private void loadData() {
@@ -227,6 +230,7 @@ public class GuildFragment extends Fragment {
             
             inviteFriendsButton.setVisibility(isLeader ? View.VISIBLE : View.GONE);
             disbandGuildButton.setVisibility(isLeader ? View.VISIBLE : View.GONE);
+            btnGuildChat.setVisibility(View.VISIBLE);
             
         } else {
             guildNameText.setText("NO GUILD");
@@ -237,6 +241,7 @@ public class GuildFragment extends Fragment {
             inviteFriendsButton.setVisibility(View.GONE);
             leaveGuildButton.setVisibility(View.GONE);
             disbandGuildButton.setVisibility(View.GONE);
+            btnGuildChat.setVisibility(View.GONE);
             noGuildText.setVisibility(View.VISIBLE);
         }
         
@@ -287,6 +292,15 @@ public class GuildFragment extends Fragment {
         getParentFragmentManager().setFragmentResultListener("invite_sent", this, (requestKey, bundle) -> {
             Toast.makeText(requireContext(), "Invite sent successfully!", Toast.LENGTH_SHORT).show();
         });
+    }
+    
+    private void navigateToGuildChat() {
+        if (currentGuild == null) {
+            Toast.makeText(requireContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        Navigation.findNavController(requireView()).navigate(R.id.navigation_guild_chat);
     }
     
     private void leaveGuild() {

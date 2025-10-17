@@ -129,6 +129,16 @@
 
         </LinearLayout>
 
+        <!-- Guild Chat Button -->
+        <Button
+            android:id="@+id/btnGuildChat"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginBottom="16dp"
+            android:text="Guild Chat"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
         <!-- Pending Invites Section -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"

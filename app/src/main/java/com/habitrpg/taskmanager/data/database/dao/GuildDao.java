@@ -10,6 +10,7 @@ import androidx.room.Update;
 import com.habitrpg.taskmanager.data.database.entities.Guild;
 import com.habitrpg.taskmanager.data.database.entities.GuildInvite;
 import com.habitrpg.taskmanager.data.database.entities.GuildMember;
+import com.habitrpg.taskmanager.data.database.entities.GuildMessage;
 
 import java.util.List;
 
@@ -108,4 +109,18 @@ public interface GuildDao {
     
     @Query("DELETE FROM guild_invites WHERE to_user_id = :userId")
     void deleteAllInvitesForUser(String userId);
+    
+    // Guild Message operations
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void insertGuildMessage(GuildMessage message);
+    
+    @Query("SELECT * FROM guild_messages WHERE guild_id = :guildId ORDER BY timestamp ASC")
+    List<GuildMessage> getGuildMessages(String guildId);
+    
+    @Query("SELECT * FROM guild_messages WHERE guild_id = :guildId ORDER BY timestamp DESC LIMIT :limit")
+    List<GuildMessage> getRecentGuildMessages(String guildId, int limit);
+    
+    @Query("DELETE FROM guild_messages WHERE guild_id = :guildId")
+    void deleteAllGuildMessages(String guildId);
 }
+
