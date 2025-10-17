@@ -12,6 +12,8 @@ public class UserPreferences {
     private static final String KEY_NOTIFICATION_ENABLED = "notification_enabled";
     private static final String KEY_FIRST_LAUNCH = "first_launch";
     private static final String KEY_LAST_SYNC_TIME = "last_sync_time";
+    private static final String KEY_CURRENT_STAGE_START_TIME = "current_stage_start_time";
+    private static final String KEY_PREVIOUS_STAGE_START_TIME = "previous_stage_start_time";
     
     private static UserPreferences instance;
     private SharedPreferences sharedPreferences;
@@ -93,6 +95,33 @@ public class UserPreferences {
         return sharedPreferences.getLong(KEY_LAST_SYNC_TIME, 0);
     }
     
+    // Stage tracking methods
+    public void setCurrentStageStartTime(long timestamp) {
+        System.out.println("DEBUG: Setting current stage start time to: " + timestamp);
+        sharedPreferences.edit()
+            .putLong(KEY_CURRENT_STAGE_START_TIME, timestamp)
+            .apply();
+    }
+    
+    public long getCurrentStageStartTime() {
+        long value = sharedPreferences.getLong(KEY_CURRENT_STAGE_START_TIME, 0);
+        System.out.println("DEBUG: Getting current stage start time: " + value);
+        return value;
+    }
+    
+    public void setPreviousStageStartTime(long timestamp) {
+        System.out.println("DEBUG: Setting previous stage start time to: " + timestamp);
+        sharedPreferences.edit()
+            .putLong(KEY_PREVIOUS_STAGE_START_TIME, timestamp)
+            .apply();
+    }
+    
+    public long getPreviousStageStartTime() {
+        long value = sharedPreferences.getLong(KEY_PREVIOUS_STAGE_START_TIME, 0);
+        System.out.println("DEBUG: Getting previous stage start time: " + value);
+        return value;
+    }
+    
     // Clear all preferences (logout)
     public void clearAllPreferences() {
         sharedPreferences.edit().clear().apply();
@@ -104,6 +133,8 @@ public class UserPreferences {
             .remove(KEY_IS_LOGGED_IN)
             .remove(KEY_CURRENT_USER_ID)
             .remove(KEY_LAST_SYNC_TIME)
+            .remove(KEY_CURRENT_STAGE_START_TIME)
+            .remove(KEY_PREVIOUS_STAGE_START_TIME)
             .apply();
     }
 }

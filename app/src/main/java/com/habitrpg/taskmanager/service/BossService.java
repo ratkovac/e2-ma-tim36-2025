@@ -10,8 +10,11 @@ import com.habitrpg.taskmanager.data.database.entities.User;
 import com.habitrpg.taskmanager.data.repository.UserRepository;
 import com.habitrpg.taskmanager.data.preferences.UserPreferences;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class BossService {
     
@@ -201,30 +204,83 @@ public class BossService {
                 if (user != null) {
                     // Use background thread for database operations
                     new Thread(() -> {
+                        // Get stage times
+                        long currentStageStartTime = userPreferences.getCurrentStageStartTime();
+                        long previousStageStartTime = userPreferences.getPreviousStageStartTime();
+                        long currentTime = System.currentTimeMillis();
+                        
+                        // Debug logging
+                        System.out.println("DEBUG: User level: " + user.getLevel());
+                        System.out.println("DEBUG: Current stage start time: " + currentStageStartTime);
+                        System.out.println("DEBUG: Previous stage start time: " + previousStageStartTime);
+                        System.out.println("DEBUG: Current time: " + currentTime);
+                        
                         // Get all tasks for user
                         List<Task> allTasks = database.taskDao().getAllTasksByUser(userId);
                         
                         // Get all completed tasks for user
                         List<TaskCompletion> allCompletions = database.taskCompletionDao().getAllCompletionsByUser(userId);
                         
-                        // Calculate success rate
-                        int totalTasks = allTasks.size();
-                        int completedTasks = allCompletions.size();
+                        // Debug logging
+                        System.out.println("DEBUG: Total tasks: " + allTasks.size());
+                        System.out.println("DEBUG: Total completions: " + allCompletions.size());
                         
-                        // Exclude paused and cancelled tasks
+                        // Filter tasks for current stage only
+                        List<Task> stageTasks = new ArrayList<>();
+                        List<TaskCompletion> stageCompletions = new ArrayList<>();
+                        
+                        if (previousStageStartTime == 0) {
+                            // If no previous stage start time (level 1), use all tasks
+                            System.out.println("DEBUG: Using all tasks (level 1)");
+                            stageTasks.addAll(allTasks);
+                            stageCompletions.addAll(allCompletions);
+                        } else {
+                            // Filter tasks created between previousStageStartTime and currentStageStartTime
+                            System.out.println("DEBUG: Filtering tasks between previous and current stage start");
+                            for (Task task : allTasks) {
+                                if (isTaskInStage(task, previousStageStartTime, currentStageStartTime)) {
+                                    stageTasks.add(task);
+                                }
+                            }
+                            
+                            // Filter completions completed between previousStageStartTime and currentStageStartTime
+                            for (TaskCompletion completion : allCompletions) {
+                                if (isCompletionInStage(completion, previousStageStartTime, currentStageStartTime)) {
+                                    stageCompletions.add(completion);
+                                }
+                            }
+                        }
+                        
+                        // Debug logging
+                        System.out.println("DEBUG: Stage tasks: " + stageTasks.size());
+                        System.out.println("DEBUG: Stage completions: " + stageCompletions.size());
+                        
+                        // Calculate success rate for current stage
                         int validTasks = 0;
-                        for (Task task : allTasks) {
+                        for (Task task : stageTasks) {
                             if (!"paused".equals(task.getStatus()) && !"cancelled".equals(task.getStatus())) {
                                 validTasks++;
                             }
                         }
                         
+                        // Debug logging
+                        System.out.println("DEBUG: Valid tasks: " + validTasks);
+                        System.out.println("DEBUG: Stage completions: " + stageCompletions.size());
+                        
                         int successRate = 0;
                         if (validTasks > 0) {
-                            successRate = (completedTasks * 100) / validTasks;
+                            successRate = (stageCompletions.size() * 100) / validTasks;
                         }
                         
+                        System.out.println("DEBUG: Final success rate: " + successRate + "%");
                         callback.onSuccess(String.valueOf(successRate));
+                        
+                        // After calculating success rate, update currentStageStartTime for next boss fight
+                        if (previousStageStartTime != 0) {
+                            long newCurrentStageStartTime = currentTime;
+                            userPreferences.setCurrentStageStartTime(newCurrentStageStartTime);
+                            System.out.println("DEBUG: Updated current stage start time after boss fight calculation: " + newCurrentStageStartTime);
+                        }
                     }).start();
                 } else {
                     callback.onError("User not found");
@@ -458,5 +514,51 @@ public class BossService {
                 }
             });
         }).start();
+    }
+    
+    /**
+     * Helper method to check if a task was created during the current stage
+     */
+    private boolean isTaskInStage(Task task, long stageStartTime, long stageEndTime) {
+        if (task.getStartDate() == null || task.getStartDate().isEmpty()) {
+            System.out.println("DEBUG: Task " + task.getId() + " has no start date");
+            return false;
+        }
+        
+        try {
+            // Parse task start date (format: YYYY-MM-DD HH:MM)
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+            Date taskDate = sdf.parse(task.getStartDate());
+            long taskTimestamp = taskDate.getTime();
+            
+            System.out.println("DEBUG: Task " + task.getId() + " start date: " + task.getStartDate() + 
+                             " -> timestamp: " + taskTimestamp + 
+                             " (stage start: " + stageStartTime + ", stage end: " + stageEndTime + ")");
+            
+            // Check if task was created between stage start and end
+            boolean inStage = taskTimestamp >= stageStartTime && taskTimestamp <= stageEndTime;
+            System.out.println("DEBUG: Task " + task.getId() + " in stage: " + inStage);
+            return inStage;
+        } catch (Exception e) {
+            // If parsing fails, exclude the task
+            System.out.println("DEBUG: Failed to parse task " + task.getId() + " start date: " + task.getStartDate() + " - " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Helper method to check if a task completion happened during the current stage
+     */
+    private boolean isCompletionInStage(TaskCompletion completion, long stageStartTime, long stageEndTime) {
+        // Use createdAt timestamp for completion time
+        long completionTimestamp = completion.getCreatedAt();
+        
+        System.out.println("DEBUG: Completion " + completion.getId() + " timestamp: " + completionTimestamp + 
+                         " (stage start: " + stageStartTime + ", stage end: " + stageEndTime + ")");
+        
+        // Check if completion happened between stage start and end
+        boolean inStage = completionTimestamp >= stageStartTime && completionTimestamp <= stageEndTime;
+        System.out.println("DEBUG: Completion " + completion.getId() + " in stage: " + inStage);
+        return inStage;
     }
 }

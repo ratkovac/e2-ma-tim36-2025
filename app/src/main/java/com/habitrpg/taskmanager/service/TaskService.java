@@ -336,6 +336,19 @@ public class TaskService {
                         }
                         user.setPowerPoints(user.getPowerPoints() + totalPPEarned);
                         ppEarned = totalPPEarned;
+                        
+                        // Update stage tracking - set previous stage start time when leveling up
+                        // This marks the beginning of the previous stage for boss fight calculation
+                        long currentTime = System.currentTimeMillis();
+                        long currentStageStartTime = userPreferences.getCurrentStageStartTime();
+                        
+                        // Set previous stage start time to current stage start time
+                        userPreferences.setPreviousStageStartTime(currentStageStartTime);
+                        System.out.println("DEBUG: Setting previous stage start time for level " + newLevel + ": " + currentStageStartTime);
+                        
+                        // Set current stage start time to current time (beginning of new stage)
+                        userPreferences.setCurrentStageStartTime(currentTime);
+                        System.out.println("DEBUG: Setting current stage start time for level " + newLevel + ": " + currentTime);
                     } else {
                         leveledUp = false;
                         ppEarned = 0;
