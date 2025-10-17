@@ -43,6 +43,17 @@
                 android:padding="8dp"
                 android:tint="@color/text_on_primary" />
 
+            <ImageButton
+                android:id="@+id/btnBossFight"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="8dp"
+                android:text="👹"
+                android:textSize="24sp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Boss Fight"
+                android:padding="8dp" />
+
         </LinearLayout>
 
         <TextView

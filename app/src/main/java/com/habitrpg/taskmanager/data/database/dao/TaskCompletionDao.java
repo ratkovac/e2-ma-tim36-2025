@@ -48,4 +48,10 @@ public interface TaskCompletionDao {
     @Query("DELETE FROM task_completions WHERE task_id IN " +
            "(SELECT id FROM tasks WHERE user_id = :userId)")
     void deleteAllCompletionsForUser(String userId);
+    
+    @SuppressWarnings(RoomWarnings.CURSOR_MISMATCH)
+    @Query("SELECT * FROM task_completions tc " +
+           "INNER JOIN tasks t ON tc.task_id = t.id " +
+           "WHERE t.user_id = :userId")
+    List<TaskCompletion> getAllCompletionsByUser(String userId);
 }

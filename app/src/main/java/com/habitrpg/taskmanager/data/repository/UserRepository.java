@@ -134,6 +134,10 @@ public class UserRepository {
                                     database.userDao().insertUser(user);
                                     database.userDao().logoutAllUsers();
                                     database.userDao().loginUser(userId);
+                                    
+                                    // Don't initialize stage start time for level 1 users
+                                    // Stage start time will be set when user levels up
+                                    
                                     callback.onSuccess("User logged in successfully");
                                 } catch (Exception e) {
                                     callback.onError("Failed to save user locally: " + e.getMessage());
@@ -147,6 +151,10 @@ public class UserRepository {
                     // User exists locally, just update login status
                     database.userDao().logoutAllUsers();
                     database.userDao().loginUser(userId);
+                    
+                    // Don't initialize stage start time for level 1 users
+                    // Stage start time will be set when user levels up
+                    
                     callback.onSuccess("User logged in successfully");
                 }
             } catch (Exception e) {

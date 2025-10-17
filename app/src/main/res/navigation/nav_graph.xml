@@ -64,4 +64,9 @@
         android:name="com.habitrpg.taskmanager.presentation.fragments.GuildChatFragment"
         android:label="Guild Chat" />
 
+    <fragment
+        android:id="@+id/navigation_boss_fight"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.BossFightFragment"
+        android:label="Boss Fight" />
+
 </navigation>
