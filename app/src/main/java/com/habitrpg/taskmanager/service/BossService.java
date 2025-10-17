@@ -365,9 +365,9 @@ public class BossService {
             
             final int damageDealt = boss.getMaxHp() - boss.getCurrentHp();
             
-            // Calculate base rewards
-            int defeatedBosses = database.bossDao().getDefeatedBossCount(userId);
-            int baseCoinReward = (int) (BASE_COIN_REWARD * Math.pow(1 + COIN_INCREASE_RATE, defeatedBosses));
+            // Calculate base rewards - use boss level instead of defeated bosses count
+            int bossLevel = boss.getLevel();
+            int baseCoinReward = (int) (BASE_COIN_REWARD * Math.pow(1 + COIN_INCREASE_RATE, bossLevel - 1));
             
             // Adjust rewards based on result
             final int finalCoinReward;
@@ -456,9 +456,9 @@ public class BossService {
     private void calculateBossRewards(Boss boss, BossCallback callback) {
         // Use background thread for database operations
         new Thread(() -> {
-            // Calculate coin reward
-            int defeatedBosses = database.bossDao().getDefeatedBossCount(boss.getUserId());
-            int coinReward = (int) (BASE_COIN_REWARD * Math.pow(1 + COIN_INCREASE_RATE, defeatedBosses));
+            // Calculate coin reward - use boss level instead of defeated bosses count
+            int bossLevel = boss.getLevel();
+            int coinReward = (int) (BASE_COIN_REWARD * Math.pow(1 + COIN_INCREASE_RATE, bossLevel - 1));
         
             // Check for equipment drop
             Random random = new Random();
