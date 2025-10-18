@@ -576,9 +576,8 @@ public class BossFightFragment extends Fragment {
         // Set rewards text
         coinsText.setText("+" + result.getCoinsEarned() + " novčića");
         
-        // 50% chance for equipment drop
-        boolean equipmentDropped = Math.random() < 0.5;
-        if (equipmentDropped) {
+        // Use equipment drop result from BossService
+        if (result.isEquipmentDropped()) {
             equipmentText.setText("Oprema: ??? ✨");
             equipmentText.setVisibility(View.VISIBLE);
         } else {
@@ -587,7 +586,9 @@ public class BossFightFragment extends Fragment {
         
         // Hide rewards initially
         coinsText.setVisibility(View.GONE);
-        equipmentText.setVisibility(View.GONE);
+        if (result.isEquipmentDropped()) {
+            equipmentText.setVisibility(View.GONE);
+        }
         
         // Shake button for testing on emulator
         shakeButton.setOnClickListener(v -> openTreasureChest(treasureChest, coinsText, equipmentText, exitButton, dialog));
@@ -644,8 +645,8 @@ public class BossFightFragment extends Fragment {
         // Show rewards with animation
         coinsText.setVisibility(View.VISIBLE);
         
-        // Add equipment if equipment is dropped
-        if (equipmentText.getVisibility() == View.VISIBLE) {
+        // Add equipment if equipment was dropped
+        if (equipmentText.getText().toString().contains("???")) {
             equipmentService.addTreasureEquipment(new EquipmentService.EquipmentCallback() {
                 @Override
                 public void onSuccess(String message, List<Equipment> equipment) {
@@ -653,6 +654,7 @@ public class BossFightFragment extends Fragment {
                         getActivity().runOnUiThread(() -> {
                             equipmentText.setText(message + " ✨");
                             equipmentText.setVisibility(View.VISIBLE);
+                            Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
                         });
                     }
                 }

@@ -235,9 +235,6 @@ public class EquipmentService {
             return;
         }
 
-        // 50% chance for weapon, 50% chance for clothing
-        boolean isWeapon = Math.random() < 0.5;
-        
         String equipmentName;
         String equipmentType;
         String equipmentDescription;
@@ -245,60 +242,60 @@ public class EquipmentService {
         String bonusType;
         double bonusValue;
         
+        // 50% chance for weapon, 50% chance for clothing
+        boolean isWeapon = Math.random() < 0.5;
+        
         if (isWeapon) {
             // 50% chance for sword, 50% chance for bow
             boolean isSword = Math.random() < 0.5;
             if (isSword) {
-                equipmentName = "Magic Sword";
+                equipmentName = "Mač";
                 equipmentType = "weapon";
-                equipmentDescription = "Sword that permanently increases strength by 5%";
+                equipmentDescription = "Mač koji trajno povećava snagu za 5%";
                 iconResource = "ic_sword";
                 bonusType = "strength";
                 bonusValue = 5.0;
             } else {
-                equipmentName = "Bow and Arrow";
+                equipmentName = "Luk i strijela";
                 equipmentType = "weapon";
-                equipmentDescription = "Bow that permanently increases coin rewards by 5%";
+                equipmentDescription = "Luk koji trajno povećava novčane nagrade za 5%";
                 iconResource = "ic_bow";
                 bonusType = "coin_bonus";
                 bonusValue = 5.0;
             }
         } else {
             // Random clothing (equal chance for each)
-            String[] clothingOptions = {
-                "Power Gloves", "Defense Shield", "Speed Boots"
-            };
-            String[] clothingDescriptions = {
-                "Gloves that increase strength by 10%",
-                "Shield that increases attack success chance by 10%",
-                "Boots that give 40% chance for extra attack"
-            };
-            String[] clothingIcons = {
-                "ic_gloves", "ic_shield", "ic_boots"
-            };
-            String[] clothingBonusTypes = {
-                "strength", "attack_chance", "extra_attack"
-            };
-            double[] clothingBonusValues = {
-                10.0, 10.0, 40.0
-            };
-            
-            int randomIndex = (int) (Math.random() * clothingOptions.length);
-            equipmentName = clothingOptions[randomIndex];
-            equipmentType = "clothing";
-            equipmentDescription = clothingDescriptions[randomIndex];
-            iconResource = clothingIcons[randomIndex];
-            bonusType = clothingBonusTypes[randomIndex];
-            bonusValue = clothingBonusValues[randomIndex];
+            double clothingRandom = Math.random();
+            if (clothingRandom < 0.333) {
+                equipmentName = "Čizme";
+                equipmentType = "clothing";
+                equipmentDescription = "Čizme koje daju 40% šanse za dodatni napad";
+                iconResource = "ic_boots";
+                bonusType = "extra_attack";
+                bonusValue = 40.0;
+            } else if (clothingRandom < 0.666) {
+                equipmentName = "Rukavice";
+                equipmentType = "clothing";
+                equipmentDescription = "Rukavice koje povećavaju snagu za 10%";
+                iconResource = "ic_gloves";
+                bonusType = "strength";
+                bonusValue = 10.0;
+            } else {
+                equipmentName = "Štit";
+                equipmentType = "clothing";
+                equipmentDescription = "Štit koji povećava šansu za uspešan napad za 10%";
+                iconResource = "ic_shield";
+                bonusType = "attack_chance";
+                bonusValue = 10.0;
+            }
         }
         
-        // Add equipment directly to inventory (no cost)
         equipmentRepository.purchaseEquipment(currentUserId, equipmentName, equipmentType,
                 equipmentDescription, 0, iconResource, bonusType, bonusValue,
                 "permanent", new EquipmentRepository.EquipmentCallback() {
                     @Override
                     public void onSuccess(String message, List<Equipment> equipment) {
-                        callback.onSuccess("Found " + equipmentName + "!", equipment);
+                        callback.onSuccess("Dobili ste: " + equipmentName, equipment);
                     }
 
                     @Override

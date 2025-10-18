@@ -50,6 +50,19 @@ public class EquipmentRepository {
         });
     }
 
+    public void getEquipmentById(String equipmentId, EquipmentCallback callback) {
+        ensureExecutorActive();
+        executor.execute(() -> {
+            try {
+                Equipment equipment = equipmentDao.getEquipmentById(equipmentId);
+                List<Equipment> equipmentList = equipment != null ? List.of(equipment) : List.of();
+                callback.onSuccess("Equipment loaded successfully", equipmentList);
+            } catch (Exception e) {
+                callback.onError("Failed to load equipment: " + e.getMessage());
+            }
+        });
+    }
+
     public void getUserEquipmentByType(String userId, String equipmentType, EquipmentCallback callback) {
         ensureExecutorActive();
         executor.execute(() -> {
@@ -105,22 +118,25 @@ public class EquipmentRepository {
                 equipment.setBonusValue(bonusValue);
                 equipment.setBonusDuration(bonusDuration);
                 equipment.setPurchaseDate(System.currentTimeMillis());
-                equipment.setActive(false); // Equipment is not active by default
                 
-                // Set durability based on equipment type
+                // Set durability and active status based on equipment type
                 if ("potion".equals(equipmentType)) {
+                    equipment.setActive(false); // Potions are not active by default
                     if ("permanent".equals(bonusDuration)) {
                         equipment.setDurability(-1); // Permanent potions last forever
                     } else {
                         equipment.setDurability(1); // Single-use potions last 1 fight
                     }
                 } else if ("weapon".equals(equipmentType)) {
+                    equipment.setActive(true); // Weapons are active by default
                     equipment.setDurability(-1); // Weapons last forever
                 } else {
+                    equipment.setActive(false); // Clothing is not active by default
                     equipment.setDurability(2); // Clothing lasts 2 fights
                 }
 
                 equipmentDao.insertEquipment(equipment);
+                android.util.Log.d("EquipmentRepository", "Equipment added to database: " + equipmentName + " for user " + userId);
                 callback.onSuccess("Equipment purchased successfully", null);
             } catch (Exception e) {
                 callback.onError("Failed to purchase equipment: " + e.getMessage());
