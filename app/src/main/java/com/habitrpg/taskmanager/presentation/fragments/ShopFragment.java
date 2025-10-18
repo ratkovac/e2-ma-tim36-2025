@@ -18,6 +18,7 @@ import com.habitrpg.taskmanager.databinding.FragmentShopBinding;
 import com.habitrpg.taskmanager.presentation.adapters.ShopAdapter;
 import com.habitrpg.taskmanager.service.EquipmentService;
 import com.habitrpg.taskmanager.service.UserPreferences;
+import com.habitrpg.taskmanager.service.BossService;
 import com.habitrpg.taskmanager.data.repository.UserRepository;
 
 import java.util.ArrayList;
@@ -28,6 +29,7 @@ public class ShopFragment extends Fragment {
     private FragmentShopBinding binding;
     private EquipmentService equipmentService;
     private UserRepository userRepository;
+    private BossService bossService;
     private User currentUser;
     private List<ShopItem> shopItems = new ArrayList<>();
     private ShopAdapter shopAdapter;
@@ -45,6 +47,7 @@ public class ShopFragment extends Fragment {
         
         equipmentService = EquipmentService.getInstance(requireContext());
         userRepository = UserRepository.getInstance(requireContext());
+        bossService = BossService.getInstance(requireContext());
         
         setupRecyclerView();
         loadCurrentUser();
@@ -101,27 +104,101 @@ public class ShopFragment extends Fragment {
     }
 
     private void initializeShopItems() {
-        shopItems.clear();
+        // Get number of defeated bosses to calculate prices based on previous boss reward
+        bossService.getDefeatedBossCount(new BossService.BossCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        // If error, use 0 defeated bosses (before first boss)
+                        android.util.Log.d("ShopFragment", "Error getting defeated boss count, using 0. Error: " + error);
+                        loadShopItemsWithPrices(0);
+                    });
+                }
+            }
+            
+            @Override
+            public void onBossRetrieved(com.habitrpg.taskmanager.data.database.entities.Boss boss) {
+                // Not used in this callback
+            }
+            
+            @Override
+            public void onBossFightResult(BossService.BossFightResult result) {
+                // Not used in this callback
+            }
+            
+            @Override
+            public void onDefeatedBossCountRetrieved(int count) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        android.util.Log.d("ShopFragment", "Defeated boss count: " + count);
+                        loadShopItemsWithPrices(count);
+                    });
+                }
+            }
+        });
+    }
+    
+    private void loadShopItemsWithPrices(int defeatedBossCount) {
+        shopItems.clear(); // Clear existing items
+        
+        // Calculate base coin reward from PREVIOUS defeated boss
+        // If defeatedBossCount = 0 (before first boss), use 200 as default
+        // If defeatedBossCount = 1 (defeated Boss 1), use Boss 1 reward = 200
+        // If defeatedBossCount = 2 (defeated Boss 2), use Boss 2 reward = 240
+        int previousBossLevel = defeatedBossCount == 0 ? 1 : defeatedBossCount;
+        int baseCoinReward = (int) (200 * Math.pow(1.20, previousBossLevel - 1));
+        
+        // Debug log
+        android.util.Log.d("ShopFragment", "Defeated Boss Count: " + defeatedBossCount + 
+                ", Previous Boss Level: " + previousBossLevel + 
+                ", Base Coin Reward: " + baseCoinReward);
+        
+        // Calculate prices based on percentages of base coin reward
+        int strengthPotion20Price = (int) (baseCoinReward * 0.50); // 50%
+        int strengthPotion40Price = (int) (baseCoinReward * 0.70); // 70%
+        int permanentStrength5Price = (int) (baseCoinReward * 2.00); // 200%
+        int permanentStrength10Price = (int) (baseCoinReward * 10.00); // 1000%
+        
+        int glovesPrice = (int) (baseCoinReward * 0.60); // 60%
+        int shieldPrice = (int) (baseCoinReward * 0.60); // 60%
+        int bootsPrice = (int) (baseCoinReward * 0.80); // 80%
+        
+        // Debug log for prices
+        android.util.Log.d("ShopFragment", "Prices - Strength20: " + strengthPotion20Price + 
+                ", Strength40: " + strengthPotion40Price + 
+                ", Permanent5: " + permanentStrength5Price + 
+                ", Permanent10: " + permanentStrength10Price);
         
         // Potions
         shopItems.add(new ShopItem("Strength Potion (+20% PP)", "Single-use strength potion that increases PP by 20%", 
-                50, "ic_potion1", "potion", "strength", 20.0, "single_use"));
+                strengthPotion20Price, "ic_potion1", "potion", "strength", 20.0, "single_use"));
         shopItems.add(new ShopItem("Power Potion (+40% PP)", "Single-use power potion that increases PP by 40%", 
-                70, "ic_potion2", "potion", "strength", 40.0, "single_use"));
+                strengthPotion40Price, "ic_potion2", "potion", "strength", 40.0, "single_use"));
         shopItems.add(new ShopItem("Permanent Strength (+5%)", "Permanent strength increase of 5%", 
-                200, "ic_potion3", "potion", "strength", 5.0, "permanent"));
+                permanentStrength5Price, "ic_potion3", "potion", "strength", 5.0, "permanent"));
         shopItems.add(new ShopItem("Permanent Power (+10%)", "Permanent power increase of 10%", 
-                1000, "ic_potion4", "potion", "strength", 10.0, "permanent"));
+                permanentStrength10Price, "ic_potion4", "potion", "strength", 10.0, "permanent"));
         
         // Clothing
         shopItems.add(new ShopItem("Power Gloves", "Gloves that increase strength by 10%", 
-                60, "ic_gloves", "clothing", "strength", 10.0, "permanent"));
+                glovesPrice, "ic_gloves", "clothing", "strength", 10.0, "permanent"));
         shopItems.add(new ShopItem("Defense Shield", "Shield that increases attack success chance by 10%", 
-                60, "ic_shield", "clothing", "attack_chance", 10.0, "permanent"));
+                shieldPrice, "ic_shield", "clothing", "attack_chance", 10.0, "permanent"));
         shopItems.add(new ShopItem("Speed Boots", "Boots that give 40% chance for extra attack", 
-                80, "ic_boots", "clothing", "extra_attack", 40.0, "permanent"));
+                bootsPrice, "ic_boots", "clothing", "extra_attack", 40.0, "permanent"));
         
-        shopAdapter.notifyDataSetChanged();
+        // Debug log for final items count
+        android.util.Log.d("ShopFragment", "Total shop items loaded: " + shopItems.size());
+        
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                shopAdapter.notifyDataSetChanged();
+            });
+        }
     }
 
     private void purchaseItem(ShopItem item) {

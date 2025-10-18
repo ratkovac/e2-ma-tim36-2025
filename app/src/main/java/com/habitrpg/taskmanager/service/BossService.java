@@ -51,6 +51,7 @@ public class BossService {
         void onError(String error);
         void onBossRetrieved(Boss boss);
         void onBossFightResult(BossFightResult result);
+        default void onDefeatedBossCountRetrieved(int count) {}
     }
     
     public static class BossFightResult {
@@ -178,6 +179,26 @@ public class BossService {
                 }
             }
         });
+    }
+    
+    /**
+     * Gets the number of defeated bosses for the current user
+     */
+    public void getDefeatedBossCount(BossCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        new Thread(() -> {
+            try {
+                int defeatedBosses = database.bossDao().getDefeatedBossCount(userId);
+                callback.onDefeatedBossCountRetrieved(defeatedBosses);
+            } catch (Exception e) {
+                callback.onError("Failed to get defeated boss count: " + e.getMessage());
+            }
+        }).start();
     }
     
     /**
