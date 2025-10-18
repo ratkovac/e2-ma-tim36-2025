@@ -46,6 +46,8 @@ public class BossFightFragment extends Fragment {
     private TextView successChanceText;
     private MaterialButton attackButton;
     private TextView shakeInstruction;
+    private TextView potentialRewardsText;
+    private TextView missText;
 
     // Services
     private BossService bossService;
@@ -67,6 +69,11 @@ public class BossFightFragment extends Fragment {
     private int remainingAttacks = 5;
     private int successChance = 0;
     private static final int MAX_ATTACKS = 5;
+    private int levelTransition; // Nivo prelaska (npr. ako prelazimo iz 2 u 3, ovo je 3)
+    
+    // Reward calculation constants (matching BossService)
+    private static final int BASE_COIN_REWARD = 200;
+    private static final double COIN_INCREASE_RATE = 0.20; // 20% increase
 
     @Nullable
     @Override
@@ -100,6 +107,8 @@ public class BossFightFragment extends Fragment {
         successChanceText = view.findViewById(R.id.success_chance_text);
         attackButton = view.findViewById(R.id.attack_button);
         shakeInstruction = view.findViewById(R.id.shake_instruction);
+        potentialRewardsText = view.findViewById(R.id.potential_rewards_text);
+        missText = view.findViewById(R.id.miss_text);
         hitSoundPlayer = MediaPlayer.create(requireContext(), R.raw.hit);
     }
 
@@ -138,8 +147,8 @@ public class BossFightFragment extends Fragment {
     }
     
     private void onShakeDetected() {
-        // This will be called when shake is detected
-        // We'll use this in the treasure dialog
+        // Perform attack when shake is detected
+        performAttack();
     }
 
     private void loadBossFightData() {
@@ -150,6 +159,7 @@ public class BossFightFragment extends Fragment {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         currentUser = user;
+                        levelTransition = user.getLevel(); // Trenutni nivo korisnika
                         loadCurrentBoss();
                     });
                 }
@@ -158,7 +168,13 @@ public class BossFightFragment extends Fragment {
     }
     
     private void loadCurrentBoss() {
-        bossService.getCurrentBoss(new BossService.BossCallback() {
+        if (currentUser == null) {
+            Toast.makeText(getContext(), "User data not loaded", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Use the new method that knows about level transition
+        bossService.getBossForLevelTransition(currentUser.getLevel(), new BossService.BossCallback() {
             @Override
             public void onSuccess(String message) {}
             
@@ -240,6 +256,26 @@ public class BossFightFragment extends Fragment {
         // Update equipment display (placeholder for now)
         equipmentName.setText("Magic Sword");
         equipmentIcon.setVisibility(View.VISIBLE);
+        
+        // Update potential rewards display
+        updatePotentialRewards();
+    }
+    
+    /**
+     * Calculate and display potential coin rewards based on boss level
+     */
+    private void updatePotentialRewards() {
+        if (currentBoss == null) {
+            return;
+        }
+        
+        // Calculate potential coin reward using the same formula as BossService
+        int bossLevel = currentBoss.getLevel();
+        int potentialCoinReward = (int) (BASE_COIN_REWARD * Math.pow(1 + COIN_INCREASE_RATE, bossLevel - 1));
+        
+        // Update the rewards text
+        String rewardsText = "Potencijalne nagrade:\n+" + potentialCoinReward + " novčića";
+        potentialRewardsText.setText(rewardsText);
     }
 
     private void performAttack() {
@@ -249,6 +285,9 @@ public class BossFightFragment extends Fragment {
         
         remainingAttacks--;
         
+        // Update UI to show decreased attack count
+        updateUI();
+        
         // Perform actual boss attack
         bossService.performBossAttack(currentBoss.getLevel(), currentUser.getPowerPoints(), new BossService.BossCallback() {
             @Override
@@ -257,8 +296,14 @@ public class BossFightFragment extends Fragment {
                     getActivity().runOnUiThread(() -> {
                         Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
                         
-                        // Play hit sound when attack is successful
-                        playHitSound();
+                        // Check if attack was successful or missed
+                        if (message.contains("successful")) {
+                            // Play hit sound when attack is successful
+                            playHitSound();
+                        } else if (message.contains("missed")) {
+                            // Play miss sound when attack misses
+                            playMissSound();
+                        }
 
                         // Check if boss is defeated or attacks exhausted
                         if (currentBoss != null && currentBoss.isDefeated()) {
@@ -325,6 +370,8 @@ public class BossFightFragment extends Fragment {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         Toast.makeText(getContext(), "Attack failed: " + error, Toast.LENGTH_SHORT).show();
+                        // Play miss sound and animation
+                        playMissSound();
                     });
                 }
             }
@@ -376,6 +423,13 @@ public class BossFightFragment extends Fragment {
         animateBossHit();
     }
     
+    private void playMissSound() {
+        // For now, just show miss animation
+        // TODO: Add miss sound if available
+        animateBossMiss();
+        animateMissText();
+    }
+    
     private void animateBossHit() {
         if (bossImage == null) return;
         
@@ -421,13 +475,80 @@ public class BossFightFragment extends Fragment {
         
         animator.start();
     }
+    
+    private void animateBossMiss() {
+        if (bossImage == null) return;
+        
+        // Create a blue tint effect for miss (different from hit)
+        ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f, 0f);
+        animator.setDuration(300); // 300ms animation
+        
+        animator.addUpdateListener(animation -> {
+            float progress = (Float) animation.getAnimatedValue();
+            
+            if (progress > 0) {
+                // Apply blue tint based on progress
+                ColorMatrix currentMatrix = new ColorMatrix();
+                currentMatrix.setSaturation(1f - progress * 0.5f); // Reduce saturation slightly
+                
+                // Add blue tint for miss
+                float blueIntensity = progress * 0.6f;
+                currentMatrix.set(new float[]{
+                    1f - blueIntensity * 0.2f, 0f, 0f, 0f, 0f,
+                    0f, 1f - blueIntensity * 0.2f, 0f, 0f, 0f,
+                    0f, 0f, 1f + blueIntensity, 0f, blueIntensity * 30f,
+                    0f, 0f, 0f, 1f, 0f
+                });
+                
+                bossImage.setColorFilter(new ColorMatrixColorFilter(currentMatrix));
+            } else {
+                // Remove color filter when animation ends
+                bossImage.clearColorFilter();
+            }
+        });
+        
+        animator.start();
+    }
+    
+    private void animateMissText() {
+        if (missText == null) return;
+        
+        // Make text visible and start animation
+        missText.setVisibility(View.VISIBLE);
+        missText.setAlpha(0f);
+        
+        // Create animation that fades in and out
+        ObjectAnimator fadeInAnimator = ObjectAnimator.ofFloat(missText, "alpha", 0f, 1f);
+        fadeInAnimator.setDuration(200); // Quick fade in
+        
+        ObjectAnimator fadeOutAnimator = ObjectAnimator.ofFloat(missText, "alpha", 1f, 0f);
+        fadeOutAnimator.setDuration(800); // Slower fade out
+        fadeOutAnimator.setStartDelay(300); // Stay visible for 300ms
+        
+        // Chain animations
+        fadeInAnimator.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(android.animation.Animator animation) {
+                fadeOutAnimator.start();
+            }
+        });
+        
+        fadeOutAnimator.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(android.animation.Animator animation) {
+                missText.setVisibility(View.GONE);
+            }
+        });
+        
+        fadeInAnimator.start();
+    }
 
     private void showBossFightResult(BossService.BossFightResult result) {
-        // Show treasure dialog for victory or partial victory
-        if (result.isVictory() || result.isPartialVictory()) {
+        // Show treasure dialog only for complete victory
+        if (result.isVictory()) {
             showTreasureDialog(result);
         } else {
-            // Show defeat dialog
+            // Show defeat dialog for both defeat and partial victory
             showDefeatDialog(result);
         }
         
@@ -436,7 +557,7 @@ public class BossFightFragment extends Fragment {
         if (result.isVictory()) {
             attackButton.setText("🎉 POBEDA!");
         } else if (result.isPartialVictory()) {
-            attackButton.setText("⚔️ DELIMIČNA POBEDA");
+            attackButton.setText("💀 PORAZ (50% nagrada)");
         } else {
             attackButton.setText("💀 PORAZ");
         }
@@ -595,12 +716,86 @@ public class BossFightFragment extends Fragment {
     }
     
     private void navigateToTasks() {
-        // Navigate back to the main tasks fragment
-        if (getActivity() != null && getParentFragmentManager() != null) {
-            // Pop the current fragment from the back stack
-            getParentFragmentManager().popBackStack();
+        if (currentUser == null) {
+            // No user data - return to tasks
+            if (getActivity() != null && getParentFragmentManager() != null) {
+                getParentFragmentManager().popBackStack();
+            }
+            return;
+        }
+        
+        int expectedBossLevel = currentUser.getLevel() - 1; // Boss level for this transition
+        
+        // Check if there are more bosses to fight
+        bossService.getBossForLevelTransition(currentUser.getLevel(), new BossService.BossCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                // No more bosses - return to tasks
+                if (getActivity() != null && getParentFragmentManager() != null) {
+                    getParentFragmentManager().popBackStack();
+                }
+            }
+            
+            @Override
+            public void onBossRetrieved(Boss boss) {
+                if (getActivity() == null) return;
+                
+                getActivity().runOnUiThread(() -> {
+                    // Check if this is a different boss than the one we just fought
+                    if (currentBoss != null && boss.getId() != currentBoss.getId()) {
+                        // There's another boss to fight
+                        currentBoss = boss;
+                        remainingAttacks = MAX_ATTACKS;
+                        
+                        // Re-enable attack button
+                        attackButton.setEnabled(true);
+                        attackButton.setText("⚔");
+                        
+                        // Update UI with new boss data
+                        updateUI();
+                        
+                        // Reload success rate for the new boss
+                        loadSuccessRate();
+                        
+                        String message = boss.getLevel() < expectedBossLevel ? 
+                            "Neporaženi boss! Level " + boss.getLevel() : 
+                            "Novi boss se pojavio! Level " + boss.getLevel();
+                        Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+                    } else {
+                        // Same boss or no more bosses - return to tasks
+                        if (getParentFragmentManager() != null) {
+                            getParentFragmentManager().popBackStack();
+                        }
+                    }
+                });
+            }
+            
+            @Override
+            public void onBossFightResult(BossService.BossFightResult result) {}
+        });
+    }
+    
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Register shake sensor listener
+        if (sensorManager != null && shakeListener != null && accelerometer != null) {
+            sensorManager.registerListener(shakeListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         }
     }
+    
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Unregister shake sensor listener
+        if (sensorManager != null && shakeListener != null) {
+            sensorManager.unregisterListener(shakeListener);
+        }
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();

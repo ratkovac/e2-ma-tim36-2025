@@ -238,4 +238,37 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <!-- Potential Rewards Display -->
+    <TextView
+        android:id="@+id/potential_rewards_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="44dp"
+        android:background="@drawable/text_background"
+        android:gravity="center"
+        android:padding="8dp"
+        android:text="Potencijalne nagrade:\n+200 novčića"
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- MISS Text Display -->
+    <TextView
+        android:id="@+id/miss_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="MISS"
+        android:textColor="@color/health_bar_color"
+        android:textSize="48sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        android:alpha="0"
+        app:layout_constraintBottom_toBottomOf="@id/boss_image"
+        app:layout_constraintEnd_toEndOf="@id/boss_image"
+        app:layout_constraintStart_toStartOf="@id/boss_image"
+        app:layout_constraintTop_toTopOf="@id/boss_image" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

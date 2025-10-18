@@ -138,7 +138,94 @@ public class BossService {
     }
     
     /**
-     * Gets the current boss based on defeated bosses count
+     * Gets boss for specific level transition - used when user levels up
+     * This ensures the correct boss is created/retrieved for the level transition
+     */
+    public void getBossForLevelTransition(int userLevel, BossCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        userRepository.getUserById(userId, new UserRepository.UserCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to get user: " + error);
+            }
+            
+            @Override
+            public void onUserRetrieved(User user) {
+                if (user != null) {
+                    new Thread(() -> {
+                        // First, check if there are any undefeated bosses with level LOWER than current boss level
+                        int expectedBossLevel = userLevel - 1; // Boss level for this transition
+                        List<Boss> undefeatedBosses = database.bossDao().getActiveBossesByUser(userId);
+                        
+                        // Filter to only get bosses with level lower than expected boss level
+                        Boss oldestUndefeatedBoss = null;
+                        for (Boss boss : undefeatedBosses) {
+                            if (boss.getLevel() < expectedBossLevel) {
+                                if (oldestUndefeatedBoss == null || boss.getLevel() < oldestUndefeatedBoss.getLevel()) {
+                                    oldestUndefeatedBoss = boss;
+                                }
+                            }
+                        }
+                        
+                        if (oldestUndefeatedBoss != null) {
+                            // Return the oldest undefeated boss (lowest level)
+                            Boss finalBoss = oldestUndefeatedBoss;
+                            callback.onBossRetrieved(finalBoss);
+                            return;
+                        }
+                        
+                        // No old undefeated bosses, check if boss for current level transition exists
+                        Boss currentLevelBoss = database.bossDao().getBossByUserAndLevel(userId, expectedBossLevel);
+                        if (currentLevelBoss != null) {
+                            callback.onBossRetrieved(currentLevelBoss);
+                        } else {
+                            // Create new boss for the current level transition
+                            createBossForLevel(expectedBossLevel, callback);
+                        }
+                    }).start();
+                } else {
+                    callback.onError("User not found");
+                }
+            }
+        });
+    }
+    
+    /**
+     * Gets existing bosses without creating new ones - used for checking if there are bosses to fight
+     */
+    public void getExistingBosses(BossCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        // Use background thread for database operations
+        new Thread(() -> {
+            // Check if there are any undefeated bosses
+            List<Boss> undefeatedBosses = database.bossDao().getActiveBossesByUser(userId);
+            
+            if (!undefeatedBosses.isEmpty()) {
+                // Return the first undefeated boss (lowest level)
+                Boss firstUndefeatedBoss = undefeatedBosses.get(0);
+                callback.onBossRetrieved(firstUndefeatedBoss);
+            } else {
+                // No undefeated bosses found - return error to indicate no bosses available
+                callback.onError("No bosses available");
+            }
+        }).start();
+    }
+    
+    /**
+     * Gets the current boss - prioritizes undefeated bosses over creating new ones
      */
     public void getCurrentBoss(BossCallback callback) {
         String userId = userPreferences.getCurrentUserId();
@@ -161,7 +248,17 @@ public class BossService {
                 if (user != null) {
                     // Use background thread for database operations
                     new Thread(() -> {
-                        // Calculate boss level based on defeated bosses count
+                        // First, check if there are any undefeated bosses
+                        List<Boss> undefeatedBosses = database.bossDao().getActiveBossesByUser(userId);
+                        
+                        if (!undefeatedBosses.isEmpty()) {
+                            // Return the first undefeated boss (lowest level)
+                            Boss firstUndefeatedBoss = undefeatedBosses.get(0);
+                            callback.onBossRetrieved(firstUndefeatedBoss);
+                            return;
+                        }
+                        
+                        // No undefeated bosses found, create new boss for next level
                         int defeatedBosses = database.bossDao().getDefeatedBossCount(userId);
                         int bossLevel = defeatedBosses + 1; // Next boss to fight
                         
