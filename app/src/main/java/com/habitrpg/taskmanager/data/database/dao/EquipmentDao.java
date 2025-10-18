@@ -49,6 +49,9 @@ public interface EquipmentDao {
     @Query("UPDATE equipment SET durability = :durability WHERE equipment_id = :equipmentId")
     void updateEquipmentDurability(String equipmentId, int durability);
 
-    @Query("DELETE FROM equipment WHERE durability <= 0")
+    @Query("DELETE FROM equipment WHERE durability <= 0 AND durability != -1")
     void deleteBrokenEquipment();
+
+    @Query("UPDATE equipment SET bonus_value = :bonusValue WHERE equipment_id = :equipmentId")
+    void updateEquipmentBonus(String equipmentId, double bonusValue);
 }

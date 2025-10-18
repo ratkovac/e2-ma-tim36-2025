@@ -4,6 +4,7 @@ import android.content.Context;
 
 import com.habitrpg.taskmanager.data.database.AppDatabase;
 import com.habitrpg.taskmanager.data.database.entities.Boss;
+import com.habitrpg.taskmanager.data.database.entities.Equipment;
 import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.data.database.entities.TaskCompletion;
 import com.habitrpg.taskmanager.data.database.entities.User;
@@ -246,62 +247,35 @@ public class BossService {
                         System.out.println("DEBUG: Total tasks: " + allTasks.size());
                         System.out.println("DEBUG: Total completions: " + allCompletions.size());
                         
-                        // Filter tasks for current stage only
-                        List<Task> stageTasks = new ArrayList<>();
-                        List<TaskCompletion> stageCompletions = new ArrayList<>();
-                        
-                        if (previousStageStartTime == 0) {
-                            // If no previous stage start time (level 1), use all tasks
-                            System.out.println("DEBUG: Using all tasks (level 1)");
-                            stageTasks.addAll(allTasks);
-                            stageCompletions.addAll(allCompletions);
-                        } else {
-                            // Filter tasks created between previousStageStartTime and currentStageStartTime
-                            System.out.println("DEBUG: Filtering tasks between previous and current stage start");
-                            for (Task task : allTasks) {
-                                if (isTaskInStage(task, previousStageStartTime, currentStageStartTime)) {
-                                    stageTasks.add(task);
-                                }
-                            }
-                            
-                            // Filter completions completed between previousStageStartTime and currentStageStartTime
-                            for (TaskCompletion completion : allCompletions) {
-                                if (isCompletionInStage(completion, previousStageStartTime, currentStageStartTime)) {
-                                    stageCompletions.add(completion);
-                                }
-                            }
-                        }
-                        
-                        // Debug logging
-                        System.out.println("DEBUG: Stage tasks: " + stageTasks.size());
-                        System.out.println("DEBUG: Stage completions: " + stageCompletions.size());
-                        
-                        // Calculate success rate for current stage
+                        // Count valid tasks and completed tasks
                         int validTasks = 0;
-                        for (Task task : stageTasks) {
-                            if (!"paused".equals(task.getStatus()) && !"cancelled".equals(task.getStatus())) {
+                        int completedTasks = 0;
+                        
+                        for (Task task : allTasks) {
+                            String status = task.getStatus();
+                            if (!"paused".equals(status) && !"cancelled".equals(status)) {
                                 validTasks++;
+                                if ("completed".equals(status)) {
+                                    completedTasks++;
+                                }
                             }
                         }
                         
                         // Debug logging
-                        System.out.println("DEBUG: Valid tasks: " + validTasks);
-                        System.out.println("DEBUG: Stage completions: " + stageCompletions.size());
+                        System.out.println("DEBUG: Total valid tasks: " + validTasks);
+                        System.out.println("DEBUG: Completed tasks: " + completedTasks);
                         
+                        // Calculate success rate based on task status
                         int successRate = 0;
                         if (validTasks > 0) {
-                            successRate = (stageCompletions.size() * 100) / validTasks;
+                            successRate = (completedTasks * 100) / validTasks;
+                            if (successRate > 100) {
+                                successRate = 100;
+                            }
                         }
                         
                         System.out.println("DEBUG: Final success rate: " + successRate + "%");
                         callback.onSuccess(String.valueOf(successRate));
-                        
-                        // After calculating success rate, update currentStageStartTime for next boss fight
-                        if (previousStageStartTime != 0) {
-                            long newCurrentStageStartTime = currentTime;
-                            userPreferences.setCurrentStageStartTime(newCurrentStageStartTime);
-                            System.out.println("DEBUG: Updated current stage start time after boss fight calculation: " + newCurrentStageStartTime);
-                        }
                     }).start();
                 } else {
                     callback.onError("User not found");
@@ -390,15 +364,19 @@ public class BossService {
             int bossLevel = boss.getLevel();
             int baseCoinReward = (int) (BASE_COIN_REWARD * Math.pow(1 + COIN_INCREASE_RATE, bossLevel - 1));
             
+            // Apply coin reward bonus from Bow and Arrow
+            double coinRewardBonus = getCoinRewardBonus(userId);
+            int boostedCoinReward = (int) (baseCoinReward * (1 + coinRewardBonus / 100.0));
+            
             // Adjust rewards based on result
             final int finalCoinReward;
             double equipmentChance;
             
             if (victory) {
-                finalCoinReward = baseCoinReward;
+                finalCoinReward = boostedCoinReward;
                 equipmentChance = EQUIPMENT_DROP_CHANCE;
             } else if (partialVictory) {
-                finalCoinReward = baseCoinReward / 2; // Half rewards
+                finalCoinReward = boostedCoinReward / 2; // Half rewards
                 equipmentChance = EQUIPMENT_DROP_CHANCE / 2; // Half chance
             } else {
                 finalCoinReward = 0; // No rewards for defeat
@@ -472,6 +450,24 @@ public class BossService {
     }
     
     /**
+     * Gets the coin reward bonus from Bow and Arrow equipment
+     */
+    private double getCoinRewardBonus(String userId) {
+        double coinRewardBonus = 0.0;
+        try {
+            List<Equipment> userEquipment = database.equipmentDao().getUserEquipment(userId);
+            for (Equipment equipment : userEquipment) {
+                if (equipment.isActive() && "coin_bonus".equals(equipment.getBonusType())) {
+                    coinRewardBonus += equipment.getBonusValue();
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.e("BossService", "Error getting coin reward bonus: " + e.getMessage());
+        }
+        return coinRewardBonus;
+    }
+    
+    /**
      * Calculates rewards for defeating a boss
      */
     private void calculateBossRewards(Boss boss, BossCallback callback) {
@@ -479,7 +475,12 @@ public class BossService {
         new Thread(() -> {
             // Calculate coin reward - use boss level instead of defeated bosses count
             int bossLevel = boss.getLevel();
-            int coinReward = (int) (BASE_COIN_REWARD * Math.pow(1 + COIN_INCREASE_RATE, bossLevel - 1));
+            int baseCoinReward = (int) (BASE_COIN_REWARD * Math.pow(1 + COIN_INCREASE_RATE, bossLevel - 1));
+            
+            // Apply coin reward bonus from Bow and Arrow
+            String userId = boss.getUserId();
+            double coinRewardBonus = getCoinRewardBonus(userId);
+            int coinReward = (int) (baseCoinReward * (1 + coinRewardBonus / 100.0));
         
             // Check for equipment drop
             Random random = new Random();
@@ -497,7 +498,6 @@ public class BossService {
             }
             
             // Update user coins
-            String userId = boss.getUserId();
             userRepository.getUserById(userId, new UserRepository.UserCallback() {
                 @Override
                 public void onSuccess(String message) {}

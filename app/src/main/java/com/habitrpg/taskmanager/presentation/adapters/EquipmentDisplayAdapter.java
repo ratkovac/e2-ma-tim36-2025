@@ -22,7 +22,9 @@ public class EquipmentDisplayAdapter extends RecyclerView.Adapter<EquipmentDispl
     public interface EquipmentClickListener {
         void onActivateClick(Equipment equipment);
         void onDeactivateClick(Equipment equipment);
+        void onUpgradeClick(Equipment equipment);
     }
+    
 
     public EquipmentDisplayAdapter(List<Equipment> equipmentList, EquipmentClickListener clickListener) {
         this.equipmentList = equipmentList;
@@ -76,27 +78,45 @@ public class EquipmentDisplayAdapter extends RecyclerView.Adapter<EquipmentDispl
 
             // Set bonus information
             String bonusText = getBonusText(equipment);
+            
+            // For weapons, show current bonus value with upgrade level
+            if ("weapon".equals(equipment.getEquipmentType())) {
+                bonusText += " (Current: " + String.format("%.1f", equipment.getBonusValue()) + "%)";
+            }
+            
             bonusTextView.setText(bonusText);
 
-            // Set status and action button with durability info
-            String statusText = equipment.isActive() ? "Active" : "Inactive";
-            if (equipment.getDurability() == -1) {
-                statusText += " (Forever)";
-            } else {
-                statusText += " (" + equipment.getDurability() + " uses left)";
-            }
-            statusTextView.setText(statusText);
-            
-            if (equipment.isActive()) {
+            // Handle button logic and status based on equipment type
+            if ("weapon".equals(equipment.getEquipmentType())) {
+                // Weapons: Show "Permanent" status and "Upgrade" button
+                statusTextView.setText("Permanent");
                 statusTextView.setTextColor(itemView.getContext().getColor(R.color.accent_color));
-                actionButton.setText("Deactivate");
-                actionButton.setTextColor(itemView.getContext().getColor(R.color.error_color));
-                actionButton.setOnClickListener(v -> clickListener.onDeactivateClick(equipment));
+                
+                actionButton.setText("Upgrade");
+                actionButton.setTextColor(itemView.getContext().getColor(R.color.primary_color));
+                actionButton.setOnClickListener(v -> clickListener.onUpgradeClick(equipment));
             } else {
-                statusTextView.setTextColor(itemView.getContext().getColor(R.color.text_secondary));
-                actionButton.setText("Activate");
-                actionButton.setTextColor(itemView.getContext().getColor(R.color.accent_color));
-                actionButton.setOnClickListener(v -> clickListener.onActivateClick(equipment));
+                // Other equipment: Show Active/Inactive status with durability
+                String statusText = equipment.isActive() ? "Active" : "Inactive";
+                if (equipment.getDurability() == -1) {
+                    statusText += " (Forever)";
+                } else {
+                    statusText += " (" + equipment.getDurability() + " uses left)";
+                }
+                statusTextView.setText(statusText);
+                
+                // Other equipment (potions, clothing) can be activated/deactivated
+                if (equipment.isActive()) {
+                    statusTextView.setTextColor(itemView.getContext().getColor(R.color.accent_color));
+                    actionButton.setText("Deactivate");
+                    actionButton.setTextColor(itemView.getContext().getColor(R.color.error_color));
+                    actionButton.setOnClickListener(v -> clickListener.onDeactivateClick(equipment));
+                } else {
+                    statusTextView.setTextColor(itemView.getContext().getColor(R.color.text_secondary));
+                    actionButton.setText("Activate");
+                    actionButton.setTextColor(itemView.getContext().getColor(R.color.accent_color));
+                    actionButton.setOnClickListener(v -> clickListener.onActivateClick(equipment));
+                }
             }
         }
 
@@ -133,16 +153,16 @@ public class EquipmentDisplayAdapter extends RecyclerView.Adapter<EquipmentDispl
             String bonusText = "";
             switch (bonusType) {
                 case "strength":
-                    bonusText = "+" + (int)bonusValue + "% Strength";
+                    bonusText = "+" + String.format("%.1f", bonusValue) + "% Strength";
                     break;
                 case "attack_chance":
-                    bonusText = "+" + (int)bonusValue + "% Attack Success";
+                    bonusText = "+" + String.format("%.1f", bonusValue) + "% Attack Success";
                     break;
                 case "extra_attack":
-                    bonusText = "+" + (int)bonusValue + "% Extra Attack Chance";
+                    bonusText = "+" + String.format("%.1f", bonusValue) + "% Extra Attack Chance";
                     break;
                 case "coin_bonus":
-                    bonusText = "+" + (int)bonusValue + "% Coin Rewards";
+                    bonusText = "+" + String.format("%.1f", bonusValue) + "% Coin Rewards";
                     break;
             }
 

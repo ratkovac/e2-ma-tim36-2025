@@ -57,6 +57,12 @@ public class EquipmentDisplayFragment extends Fragment {
             public void onDeactivateClick(Equipment equipment) {
                 deactivateEquipment(equipment);
             }
+
+            @Override
+            public void onUpgradeClick(Equipment equipment) {
+                // Upgrade equipment
+                upgradeEquipment(equipment);
+            }
         });
         binding.recyclerViewEquipment.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.recyclerViewEquipment.setAdapter(equipmentAdapter);
@@ -146,9 +152,33 @@ public class EquipmentDisplayFragment extends Fragment {
         });
     }
 
+    private void upgradeEquipment(Equipment equipment) {
+        equipmentService.upgradeEquipment(equipment.getEquipmentId(), new EquipmentService.EquipmentCallback() {
+            @Override
+            public void onSuccess(String message, List<Equipment> equipment) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                        loadUserEquipment(); // Refresh the list
+                    });
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+                    });
+                }
+            }
+        });
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         binding = null;
     }
 }
+

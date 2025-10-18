@@ -201,6 +201,19 @@ public class EquipmentRepository {
         });
     }
 
+    public void updateEquipmentBonus(String equipmentId, double newBonusValue, EquipmentCallback callback) {
+        ensureExecutorActive();
+        executor.execute(() -> {
+            try {
+                equipmentDao.updateEquipmentBonus(equipmentId, newBonusValue);
+                android.util.Log.d("EquipmentRepository", "Equipment bonus updated: " + equipmentId + " to " + newBonusValue + "%");
+                callback.onSuccess("Equipment bonus updated successfully", null);
+            } catch (Exception e) {
+                callback.onError("Failed to update equipment bonus: " + e.getMessage());
+            }
+        });
+    }
+
     public void shutdown() {
         if (executor != null && !executor.isShutdown()) {
             executor.shutdown();

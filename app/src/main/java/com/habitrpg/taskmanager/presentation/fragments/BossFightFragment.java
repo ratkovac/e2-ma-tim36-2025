@@ -305,6 +305,9 @@ public class BossFightFragment extends Fragment {
         // Update success chance (with attack chance bonus)
         int bonusSuccessChance = (int) attackChanceBonus;
         int totalSuccessChance = successChance + bonusSuccessChance;
+        if (totalSuccessChance > 100) {
+            totalSuccessChance = 100;
+        }
         successChanceText.setText(totalSuccessChance + "%" + (bonusSuccessChance > 0 ? " (+" + bonusSuccessChance + "%)" : ""));
 
         // Update equipment display (placeholder for now)

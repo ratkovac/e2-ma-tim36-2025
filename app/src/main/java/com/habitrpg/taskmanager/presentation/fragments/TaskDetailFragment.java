@@ -228,9 +228,9 @@ public class TaskDetailFragment extends Fragment {
                     if (getActivity() != null && isAdded() && getView() != null) {
                         getActivity().runOnUiThread(() -> {
                             try {
-                                // Navigate to boss fight
+                                // Navigate to pre-boss inventory
                                 androidx.navigation.Navigation.findNavController(requireView())
-                                    .navigate(R.id.navigation_boss_fight);
+                                    .navigate(R.id.navigation_pre_boss_inventory);
                             } catch (Exception e) {
                                 // Fragment might be detached, ignore navigation
                             }
