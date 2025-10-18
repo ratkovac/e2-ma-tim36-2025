@@ -121,6 +121,10 @@ public class AuthService {
                         String userId = firebaseUser.getUid();
                         User user = new User(userId, email, username, avatarId);
                         
+                        // Set user as logged in and save user ID
+                        userPreferences.setLoggedIn(true);
+                        userPreferences.setCurrentUserId(userId);
+                        
                         userRepository.createUserDocument(user, new UserRepository.UserCallback() {
                                  @Override
                                  public void onSuccess(String message) {

@@ -28,9 +28,14 @@ import androidx.fragment.app.Fragment;
 import com.google.android.material.button.MaterialButton;
 import com.habitrpg.taskmanager.R;
 import com.habitrpg.taskmanager.data.database.entities.Boss;
+import com.habitrpg.taskmanager.data.database.entities.Equipment;
 import com.habitrpg.taskmanager.data.database.entities.User;
 import com.habitrpg.taskmanager.service.AuthService;
 import com.habitrpg.taskmanager.service.BossService;
+import com.habitrpg.taskmanager.service.EquipmentService;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class BossFightFragment extends Fragment {
 
@@ -50,6 +55,12 @@ public class BossFightFragment extends Fragment {
     // Services
     private BossService bossService;
     private AuthService authService;
+    private EquipmentService equipmentService;
+    
+    // Equipment bonuses
+    private double strengthBonus = 0.0;
+    private double attackChanceBonus = 0.0;
+    private int extraAttacks = 0;
 
     private MediaPlayer hitSoundPlayer;
 
@@ -81,6 +92,7 @@ public class BossFightFragment extends Fragment {
         // Initialize services
         bossService = BossService.getInstance(requireContext());
         authService = AuthService.getInstance(requireContext());
+        equipmentService = EquipmentService.getInstance(requireContext());
         
         initializeViews(view);
         setupClickListeners();
@@ -150,11 +162,64 @@ public class BossFightFragment extends Fragment {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         currentUser = user;
+                        loadActiveEquipment();
+                    });
+                }
+            }
+        });
+    }
+    
+    private void loadActiveEquipment() {
+        equipmentService.getActiveEquipment(new EquipmentService.EquipmentCallback() {
+            @Override
+            public void onSuccess(String message, List<Equipment> equipment) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        calculateEquipmentBonuses(equipment);
+                        loadCurrentBoss();
+                    });
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        // Continue without equipment bonuses
                         loadCurrentBoss();
                     });
                 }
             }
         });
+    }
+    
+    private void calculateEquipmentBonuses(List<Equipment> equipment) {
+        // Reset bonuses
+        strengthBonus = 0.0;
+        attackChanceBonus = 0.0;
+        extraAttacks = 0;
+        
+        // Calculate bonuses from active equipment
+        for (Equipment item : equipment) {
+            if (item.isActive()) {
+                switch (item.getBonusType()) {
+                    case "strength":
+                        strengthBonus += item.getBonusValue();
+                        break;
+                    case "attack_chance":
+                        attackChanceBonus += item.getBonusValue();
+                        break;
+                    case "extra_attack":
+                        // Calculate percentage of base attacks (40% of 5 = 2 extra attacks)
+                        int extraAttacksFromItem = (int) Math.round(MAX_ATTACKS * (item.getBonusValue() / 100.0));
+                        extraAttacks += extraAttacksFromItem;
+                        break;
+                }
+            }
+        }
+        
+        // Update max attacks based on extra attacks bonus
+        remainingAttacks = MAX_ATTACKS + extraAttacks;
     }
     
     private void loadCurrentBoss() {
@@ -226,16 +291,24 @@ public class BossFightFragment extends Fragment {
         bossHealthBar.setMax(currentBoss.getMaxHp());
         bossHealthBar.setProgress(currentBoss.getCurrentHp());
 
-        // Update player PP
-        playerPpText.setText(currentUser.getPowerPoints() + " PP");
-        playerPpBar.setMax(currentUser.getPowerPoints() + 100); // Set max to current PP + buffer
-        playerPpBar.setProgress(currentUser.getPowerPoints());
+        // Update player PP (with equipment bonuses)
+        int bonusPP = (int) (currentUser.getPowerPoints() * (strengthBonus / 100.0));
+        int totalPP = currentUser.getPowerPoints() + bonusPP;
+        playerPpText.setText(totalPP + " PP" + (bonusPP > 0 ? " (+" + bonusPP + ")" : ""));
+        playerPpBar.setMax(totalPP + 100); // Set max to current PP + buffer
+        playerPpBar.setProgress(totalPP);
 
-        // Update attack counter
-        attackCounter.setText(remainingAttacks + " / 5");
+        // Update attack counter (with extra attacks)
+        int maxAttacks = MAX_ATTACKS + extraAttacks;
+        attackCounter.setText(remainingAttacks + " / " + maxAttacks);
 
-        // Update success chance
-        successChanceText.setText(successChance + "%");
+        // Update success chance (with attack chance bonus)
+        int bonusSuccessChance = (int) attackChanceBonus;
+        int totalSuccessChance = successChance + bonusSuccessChance;
+        if (totalSuccessChance > 100) {
+            totalSuccessChance = 100;
+        }
+        successChanceText.setText(totalSuccessChance + "%" + (bonusSuccessChance > 0 ? " (+" + bonusSuccessChance + "%)" : ""));
 
         // Update equipment display (placeholder for now)
         equipmentName.setText("Magic Sword");
@@ -249,8 +322,12 @@ public class BossFightFragment extends Fragment {
         
         remainingAttacks--;
         
-        // Perform actual boss attack
-        bossService.performBossAttack(currentBoss.getLevel(), currentUser.getPowerPoints(), new BossService.BossCallback() {
+        // Calculate total power points with equipment bonuses
+        int bonusPP = (int) (currentUser.getPowerPoints() * (strengthBonus / 100.0));
+        int totalPP = currentUser.getPowerPoints() + bonusPP;
+        
+        // Perform actual boss attack with bonus power points
+        bossService.performBossAttack(currentBoss.getLevel(), totalPP, new BossService.BossCallback() {
             @Override
             public void onSuccess(String message) {
                 if (getActivity() != null) {
@@ -263,7 +340,8 @@ public class BossFightFragment extends Fragment {
                         // Check if boss is defeated or attacks exhausted
                         if (currentBoss != null && currentBoss.isDefeated()) {
                             // Boss defeated - end fight with victory
-                            bossService.endBossFight(currentBoss, MAX_ATTACKS - remainingAttacks, new BossService.BossCallback() {
+                            int maxAttacks = MAX_ATTACKS + extraAttacks;
+                            bossService.endBossFight(currentBoss, maxAttacks - remainingAttacks, new BossService.BossCallback() {
                                 @Override
                                 public void onSuccess(String message) {}
                                 
@@ -290,7 +368,8 @@ public class BossFightFragment extends Fragment {
                             });
                         } else if (remainingAttacks <= 0) {
                             // Attacks exhausted - end fight
-                            bossService.endBossFight(currentBoss, MAX_ATTACKS, new BossService.BossCallback() {
+                            int maxAttacks = MAX_ATTACKS + extraAttacks;
+                            bossService.endBossFight(currentBoss, maxAttacks, new BossService.BossCallback() {
                                 @Override
                                 public void onSuccess(String message) {}
                                 
@@ -422,7 +501,47 @@ public class BossFightFragment extends Fragment {
         animator.start();
     }
 
+    private void reduceEquipmentDurability() {
+        // Get active equipment and reduce durability
+        equipmentService.getActiveEquipment(new EquipmentService.EquipmentCallback() {
+            @Override
+            public void onSuccess(String message, List<Equipment> equipment) {
+                if (!equipment.isEmpty()) {
+                    // Filter out equipment with durability -1 (forever)
+                    List<Equipment> equipmentToReduce = new ArrayList<>();
+                    for (Equipment item : equipment) {
+                        if (item.getDurability() != -1) {
+                            equipmentToReduce.add(item);
+                        }
+                    }
+                    
+                    if (!equipmentToReduce.isEmpty()) {
+                        equipmentService.reduceEquipmentDurability(equipmentToReduce, new EquipmentService.EquipmentCallback() {
+                            @Override
+                            public void onSuccess(String message, List<Equipment> updatedEquipment) {
+                                // Equipment durability updated successfully
+                            }
+
+                            @Override
+                            public void onError(String error) {
+                                // Log error but don't show to user
+                            }
+                        });
+                    }
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                // Log error but don't show to user
+            }
+        });
+    }
+
     private void showBossFightResult(BossService.BossFightResult result) {
+        // Reduce equipment durability after boss fight
+        reduceEquipmentDurability();
+        
         // Show treasure dialog for victory or partial victory
         if (result.isVictory() || result.isPartialVictory()) {
             showTreasureDialog(result);
@@ -459,8 +578,10 @@ public class BossFightFragment extends Fragment {
         
         // Set rewards text
         coinsText.setText("+" + result.getCoinsEarned() + " novčića");
+        
+        // Use equipment drop result from BossService
         if (result.isEquipmentDropped()) {
-            equipmentText.setText("Oprema: " + result.getEquipmentEarned() + " ✨");
+            equipmentText.setText("Oprema: ??? ✨");
             equipmentText.setVisibility(View.VISIBLE);
         } else {
             equipmentText.setVisibility(View.GONE);
@@ -468,7 +589,9 @@ public class BossFightFragment extends Fragment {
         
         // Hide rewards initially
         coinsText.setVisibility(View.GONE);
-        equipmentText.setVisibility(View.GONE);
+        if (result.isEquipmentDropped()) {
+            equipmentText.setVisibility(View.GONE);
+        }
         
         // Shake button for testing on emulator
         shakeButton.setOnClickListener(v -> openTreasureChest(treasureChest, coinsText, equipmentText, exitButton, dialog));
@@ -524,8 +647,31 @@ public class BossFightFragment extends Fragment {
         
         // Show rewards with animation
         coinsText.setVisibility(View.VISIBLE);
-        if (equipmentText.getVisibility() == View.VISIBLE) {
-            equipmentText.setVisibility(View.VISIBLE);
+        
+        // Add equipment if equipment was dropped
+        if (equipmentText.getText().toString().contains("???")) {
+            equipmentService.addTreasureEquipment(new EquipmentService.EquipmentCallback() {
+                @Override
+                public void onSuccess(String message, List<Equipment> equipment) {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            equipmentText.setText(message + " ✨");
+                            equipmentText.setVisibility(View.VISIBLE);
+                            Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
+                        });
+                    }
+                }
+
+                @Override
+                public void onError(String error) {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            equipmentText.setText("Equipment not found");
+                            equipmentText.setVisibility(View.VISIBLE);
+                        });
+                    }
+                }
+            });
         }
         
         // Show exit button
