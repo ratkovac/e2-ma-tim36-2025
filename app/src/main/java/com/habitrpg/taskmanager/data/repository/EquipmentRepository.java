@@ -106,6 +106,19 @@ public class EquipmentRepository {
                 equipment.setBonusDuration(bonusDuration);
                 equipment.setPurchaseDate(System.currentTimeMillis());
                 equipment.setActive(false); // Equipment is not active by default
+                
+                // Set durability based on equipment type
+                if ("potion".equals(equipmentType)) {
+                    if ("permanent".equals(bonusDuration)) {
+                        equipment.setDurability(-1); // Permanent potions last forever
+                    } else {
+                        equipment.setDurability(1); // Single-use potions last 1 fight
+                    }
+                } else if ("weapon".equals(equipmentType)) {
+                    equipment.setDurability(-1); // Weapons last forever
+                } else {
+                    equipment.setDurability(2); // Clothing lasts 2 fights
+                }
 
                 equipmentDao.insertEquipment(equipment);
                 callback.onSuccess("Equipment purchased successfully", null);
@@ -147,6 +160,27 @@ public class EquipmentRepository {
                 callback.onSuccess("Equipment count retrieved successfully", count);
             } catch (Exception e) {
                 callback.onError("Failed to get equipment count: " + e.getMessage());
+            }
+        });
+    }
+
+    public void reduceEquipmentDurability(List<Equipment> activeEquipment, EquipmentCallback callback) {
+        ensureExecutorActive();
+        executor.execute(() -> {
+            try {
+                for (Equipment equipment : activeEquipment) {
+                    if (equipment.isActive() && equipment.getDurability() != -1) {
+                        int newDurability = equipment.getDurability() - 1;
+                        equipmentDao.updateEquipmentDurability(equipment.getEquipmentId(), newDurability);
+                    }
+                }
+                
+                // Delete equipment with durability <= 0 (but not -1 which means forever)
+                equipmentDao.deleteBrokenEquipment();
+                
+                callback.onSuccess("Equipment durability updated successfully", null);
+            } catch (Exception e) {
+                callback.onError("Failed to update equipment durability: " + e.getMessage());
             }
         });
     }

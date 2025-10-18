@@ -78,15 +78,21 @@ public class EquipmentDisplayAdapter extends RecyclerView.Adapter<EquipmentDispl
             String bonusText = getBonusText(equipment);
             bonusTextView.setText(bonusText);
 
-            // Set status and action button
+            // Set status and action button with durability info
+            String statusText = equipment.isActive() ? "Active" : "Inactive";
+            if (equipment.getDurability() == -1) {
+                statusText += " (Forever)";
+            } else {
+                statusText += " (" + equipment.getDurability() + " uses left)";
+            }
+            statusTextView.setText(statusText);
+            
             if (equipment.isActive()) {
-                statusTextView.setText("Active");
                 statusTextView.setTextColor(itemView.getContext().getColor(R.color.accent_color));
                 actionButton.setText("Deactivate");
                 actionButton.setTextColor(itemView.getContext().getColor(R.color.error_color));
                 actionButton.setOnClickListener(v -> clickListener.onDeactivateClick(equipment));
             } else {
-                statusTextView.setText("Inactive");
                 statusTextView.setTextColor(itemView.getContext().getColor(R.color.text_secondary));
                 actionButton.setText("Activate");
                 actionButton.setTextColor(itemView.getContext().getColor(R.color.accent_color));
@@ -110,6 +116,10 @@ public class EquipmentDisplayAdapter extends RecyclerView.Adapter<EquipmentDispl
                     return R.drawable.ic_shield;
                 case "ic_boots":
                     return R.drawable.ic_boots;
+                case "ic_sword":
+                    return R.drawable.ic_sword;
+                case "ic_bow":
+                    return R.drawable.ic_bow;
                 default:
                     return R.drawable.ic_potion1; // Default icon
             }
@@ -130,6 +140,9 @@ public class EquipmentDisplayAdapter extends RecyclerView.Adapter<EquipmentDispl
                     break;
                 case "extra_attack":
                     bonusText = "+" + (int)bonusValue + "% Extra Attack Chance";
+                    break;
+                case "coin_bonus":
+                    bonusText = "+" + (int)bonusValue + "% Coin Rewards";
                     break;
             }
 

@@ -46,6 +46,9 @@ public class Equipment {
     @ColumnInfo(name = "is_active")
     private boolean isActive;
 
+    @ColumnInfo(name = "durability")
+    private int durability;
+
     public Equipment() {
         this.equipmentId = "";
         this.userId = "";
@@ -59,12 +62,13 @@ public class Equipment {
         this.bonusDuration = "";
         this.purchaseDate = System.currentTimeMillis();
         this.isActive = false;
+        this.durability = 2; // Default durability
     }
 
     @Ignore
     public Equipment(@NonNull String equipmentId, String userId, String equipmentType, String equipmentName, 
                     String equipmentDescription, int price, String iconResource, String bonusType, 
-                    double bonusValue, String bonusDuration, long purchaseDate, boolean isActive) {
+                    double bonusValue, String bonusDuration, long purchaseDate, boolean isActive, int durability) {
         this.equipmentId = equipmentId;
         this.userId = userId;
         this.equipmentType = equipmentType;
@@ -77,6 +81,7 @@ public class Equipment {
         this.bonusDuration = bonusDuration;
         this.purchaseDate = purchaseDate;
         this.isActive = isActive;
+        this.durability = durability;
     }
 
     @NonNull
@@ -174,5 +179,13 @@ public class Equipment {
 
     public void setActive(boolean active) {
         isActive = active;
+    }
+
+    public int getDurability() {
+        return durability;
+    }
+
+    public void setDurability(int durability) {
+        this.durability = durability;
     }
 }

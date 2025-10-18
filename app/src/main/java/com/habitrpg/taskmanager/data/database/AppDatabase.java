@@ -31,7 +31,7 @@ import com.habitrpg.taskmanager.data.database.entities.UserStatistics;
 @Database(
         entities = {User.class, Category.class, Task.class, TaskCompletion.class, UserStatistics.class, 
                     Friend.class, FriendRequest.class, Guild.class, GuildMember.class, GuildInvite.class, GuildMessage.class, Boss.class, Equipment.class},
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {

@@ -100,6 +100,10 @@ public class ShopAdapter extends RecyclerView.Adapter<ShopAdapter.ShopViewHolder
                     return R.drawable.ic_shield;
                 case "ic_boots":
                     return R.drawable.ic_boots;
+                case "ic_sword":
+                    return R.drawable.ic_sword;
+                case "ic_bow":
+                    return R.drawable.ic_bow;
                 default:
                     return R.drawable.ic_potion1; // Default icon
             }
@@ -120,6 +124,9 @@ public class ShopAdapter extends RecyclerView.Adapter<ShopAdapter.ShopViewHolder
                     break;
                 case "extra_attack":
                     bonusText = "+" + (int)bonusValue + "% Extra Attack Chance";
+                    break;
+                case "coin_bonus":
+                    bonusText = "+" + (int)bonusValue + "% Coin Rewards";
                     break;
             }
 

@@ -45,4 +45,10 @@ public interface EquipmentDao {
 
     @Query("SELECT * FROM equipment WHERE equipment_id = :equipmentId")
     Equipment getEquipmentById(String equipmentId);
+
+    @Query("UPDATE equipment SET durability = :durability WHERE equipment_id = :equipmentId")
+    void updateEquipmentDurability(String equipmentId, int durability);
+
+    @Query("DELETE FROM equipment WHERE durability <= 0")
+    void deleteBrokenEquipment();
 }

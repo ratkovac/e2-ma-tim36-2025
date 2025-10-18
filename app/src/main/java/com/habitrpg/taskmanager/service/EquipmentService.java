@@ -214,6 +214,100 @@ public class EquipmentService {
         });
     }
 
+    public void reduceEquipmentDurability(List<Equipment> activeEquipment, EquipmentCallback callback) {
+        equipmentRepository.reduceEquipmentDurability(activeEquipment, new EquipmentRepository.EquipmentCallback() {
+            @Override
+            public void onSuccess(String message, List<Equipment> equipment) {
+                callback.onSuccess(message, equipment);
+            }
+
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+        });
+    }
+
+    public void addTreasureEquipment(EquipmentCallback callback) {
+        String currentUserId = userPreferences.getCurrentUserId();
+        if (currentUserId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+
+        // 50% chance for weapon, 50% chance for clothing
+        boolean isWeapon = Math.random() < 0.5;
+        
+        String equipmentName;
+        String equipmentType;
+        String equipmentDescription;
+        String iconResource;
+        String bonusType;
+        double bonusValue;
+        
+        if (isWeapon) {
+            // 50% chance for sword, 50% chance for bow
+            boolean isSword = Math.random() < 0.5;
+            if (isSword) {
+                equipmentName = "Magic Sword";
+                equipmentType = "weapon";
+                equipmentDescription = "Sword that permanently increases strength by 5%";
+                iconResource = "ic_sword";
+                bonusType = "strength";
+                bonusValue = 5.0;
+            } else {
+                equipmentName = "Bow and Arrow";
+                equipmentType = "weapon";
+                equipmentDescription = "Bow that permanently increases coin rewards by 5%";
+                iconResource = "ic_bow";
+                bonusType = "coin_bonus";
+                bonusValue = 5.0;
+            }
+        } else {
+            // Random clothing (equal chance for each)
+            String[] clothingOptions = {
+                "Power Gloves", "Defense Shield", "Speed Boots"
+            };
+            String[] clothingDescriptions = {
+                "Gloves that increase strength by 10%",
+                "Shield that increases attack success chance by 10%",
+                "Boots that give 40% chance for extra attack"
+            };
+            String[] clothingIcons = {
+                "ic_gloves", "ic_shield", "ic_boots"
+            };
+            String[] clothingBonusTypes = {
+                "strength", "attack_chance", "extra_attack"
+            };
+            double[] clothingBonusValues = {
+                10.0, 10.0, 40.0
+            };
+            
+            int randomIndex = (int) (Math.random() * clothingOptions.length);
+            equipmentName = clothingOptions[randomIndex];
+            equipmentType = "clothing";
+            equipmentDescription = clothingDescriptions[randomIndex];
+            iconResource = clothingIcons[randomIndex];
+            bonusType = clothingBonusTypes[randomIndex];
+            bonusValue = clothingBonusValues[randomIndex];
+        }
+        
+        // Add equipment directly to inventory (no cost)
+        equipmentRepository.purchaseEquipment(currentUserId, equipmentName, equipmentType,
+                equipmentDescription, 0, iconResource, bonusType, bonusValue,
+                "permanent", new EquipmentRepository.EquipmentCallback() {
+                    @Override
+                    public void onSuccess(String message, List<Equipment> equipment) {
+                        callback.onSuccess("Found " + equipmentName + "!", equipment);
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        callback.onError(error);
+                    }
+                });
+    }
+
     public interface EquipmentCallback {
         void onSuccess(String message, List<Equipment> equipment);
         void onError(String error);
