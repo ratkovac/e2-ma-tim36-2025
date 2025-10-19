@@ -5,14 +5,18 @@ import androidx.room.Room;
 import androidx.room.RoomDatabase;
 import android.content.Context;
 
+import com.habitrpg.taskmanager.data.database.dao.BossDao;
 import com.habitrpg.taskmanager.data.database.dao.CategoryDao;
+import com.habitrpg.taskmanager.data.database.dao.EquipmentDao;
 import com.habitrpg.taskmanager.data.database.dao.FriendDao;
 import com.habitrpg.taskmanager.data.database.dao.GuildDao;
 import com.habitrpg.taskmanager.data.database.dao.TaskCompletionDao;
 import com.habitrpg.taskmanager.data.database.dao.TaskDao;
 import com.habitrpg.taskmanager.data.database.dao.UserDao;
 import com.habitrpg.taskmanager.data.database.dao.UserStatisticsDao;
+import com.habitrpg.taskmanager.data.database.entities.Boss;
 import com.habitrpg.taskmanager.data.database.entities.Category;
+import com.habitrpg.taskmanager.data.database.entities.Equipment;
 import com.habitrpg.taskmanager.data.database.entities.Friend;
 import com.habitrpg.taskmanager.data.database.entities.FriendRequest;
 import com.habitrpg.taskmanager.data.database.entities.Guild;
@@ -26,8 +30,8 @@ import com.habitrpg.taskmanager.data.database.entities.UserStatistics;
 
 @Database(
         entities = {User.class, Category.class, Task.class, TaskCompletion.class, UserStatistics.class, 
-                    Friend.class, FriendRequest.class, Guild.class, GuildMember.class, GuildInvite.class, GuildMessage.class},
-    version = 5,
+                    Friend.class, FriendRequest.class, Guild.class, GuildMember.class, GuildInvite.class, GuildMessage.class, Boss.class, Equipment.class},
+    version = 8,
     exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
@@ -41,6 +45,8 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract UserStatisticsDao userStatisticsDao();
     public abstract FriendDao friendDao();
     public abstract GuildDao guildDao();
+    public abstract BossDao bossDao();
+    public abstract EquipmentDao equipmentDao();
     
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {

@@ -336,6 +336,19 @@ public class TaskService {
                         }
                         user.setPowerPoints(user.getPowerPoints() + totalPPEarned);
                         ppEarned = totalPPEarned;
+                        
+                        // Update stage tracking - set previous stage start time when leveling up
+                        // This marks the beginning of the previous stage for boss fight calculation
+                        long currentTime = System.currentTimeMillis();
+                        long currentStageStartTime = userPreferences.getCurrentStageStartTime();
+                        
+                        // Set previous stage start time to current stage start time
+                        userPreferences.setPreviousStageStartTime(currentStageStartTime);
+                        System.out.println("DEBUG: Setting previous stage start time for level " + newLevel + ": " + currentStageStartTime);
+                        
+                        // Set current stage start time to current time (beginning of new stage)
+                        userPreferences.setCurrentStageStartTime(currentTime);
+                        System.out.println("DEBUG: Setting current stage start time for level " + newLevel + ": " + currentTime);
                     } else {
                         leveledUp = false;
                         ppEarned = 0;
@@ -350,6 +363,8 @@ public class TaskService {
                                 if (ppEarned > 0) {
                                     resultMessage += "\n+" + ppEarned + " Power Points earned!";
                                 }
+                                // Trigger boss fight for level up
+                                callback.onLevelUp(newLevel, ppEarned);
                             }
                             callback.onSuccess(resultMessage);
                         }
@@ -957,6 +972,9 @@ public class TaskService {
         void onSuccess(String message);
         void onError(String error);
         void onTasksRetrieved(List<Task> tasks);
+        default void onLevelUp(int newLevel, int ppEarned) {
+            // Default implementation - can be overridden
+        }
     }
     
     public interface TaskListCallback {

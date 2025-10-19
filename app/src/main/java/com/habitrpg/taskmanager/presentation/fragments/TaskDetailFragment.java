@@ -76,8 +76,12 @@ public class TaskDetailFragment extends Fragment {
             public void onTasksRetrieved(List<Task> tasks) {
                 if (tasks != null && !tasks.isEmpty()) {
                     currentTask = tasks.get(0);
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(() -> displayTaskDetails());
+                    if (getActivity() != null && isAdded()) {
+                        getActivity().runOnUiThread(() -> {
+                            if (binding != null) {
+                                displayTaskDetails();
+                            }
+                        });
                     }
                 }
             }
@@ -85,7 +89,7 @@ public class TaskDetailFragment extends Fragment {
     }
     
     private void displayTaskDetails() {
-        if (currentTask == null) return;
+        if (currentTask == null || binding == null) return;
         
         // Basic info
         binding.tvTaskName.setText(currentTask.getName());
@@ -218,6 +222,21 @@ public class TaskDetailFragment extends Fragment {
                 
                 @Override
                 public void onTasksRetrieved(List<Task> tasks) {}
+                
+                @Override
+                public void onLevelUp(int newLevel, int ppEarned) {
+                    if (getActivity() != null && isAdded() && getView() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            try {
+                                // Navigate to pre-boss inventory
+                                androidx.navigation.Navigation.findNavController(requireView())
+                                    .navigate(R.id.navigation_pre_boss_inventory);
+                            } catch (Exception e) {
+                                // Fragment might be detached, ignore navigation
+                            }
+                        });
+                    }
+                }
             });
         } else {
             taskService.updateTaskStatus(taskId, newStatus, new TaskService.TaskCallback() {

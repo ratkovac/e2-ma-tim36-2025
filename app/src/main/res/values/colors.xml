@@ -43,4 +43,17 @@
     <color name="important">#FFA726</color>
     <color name="very_important">#EF5350</color>
     <color name="special">#AB47BC</color>
+    
+    <!-- Boss Fight Colors -->
+    <color name="health_bar_color">#F44336</color>
+    <color name="pp_bar_color">#2196F3</color>
+    <color name="attack_button_color">#FF5722</color>
+    <color name="boss_placeholder_color">#8D6E63</color>
+    <color name="boss_border_color">#5D4037</color>
+    <color name="equipment_placeholder_color">#FFC107</color>
+    <color name="equipment_border_color">#FF8F00</color>
+    
+    <!-- Additional Colors -->
+    <color name="light_gray">#F5F5F5</color>
+    <color name="accent_color">#03DAC6</color>
 </resources>

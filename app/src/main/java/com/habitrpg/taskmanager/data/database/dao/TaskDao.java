@@ -60,4 +60,7 @@ public interface TaskDao {
     
     @Query("SELECT COUNT(*) FROM tasks WHERE user_id = :userId AND difficulty = 'extreme' AND DATE(start_date) >= :weekStart AND DATE(start_date) <= :weekEnd AND status = 'active'")
     int getExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd);
+    
+    @Query("SELECT * FROM tasks WHERE user_id = :userId")
+    List<Task> getAllTasksByUser(String userId);
 }
