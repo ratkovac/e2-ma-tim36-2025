@@ -75,3 +75,4 @@
         tools:listitem="@layout/item_shop" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
+

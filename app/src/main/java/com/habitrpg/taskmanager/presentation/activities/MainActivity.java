@@ -1,9 +1,14 @@
 package com.habitrpg.taskmanager.presentation.activities;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.ui.NavigationUI;
@@ -11,9 +16,14 @@ import androidx.navigation.ui.NavigationUI;
 import com.habitrpg.taskmanager.R;
 import com.habitrpg.taskmanager.service.AuthService;
 import com.habitrpg.taskmanager.service.TaskService;
+import com.habitrpg.taskmanager.service.GuildInviteListenerService;
+import com.habitrpg.taskmanager.service.FriendRequestListenerService;
+import com.habitrpg.taskmanager.service.FriendshipListenerService;
 import com.habitrpg.taskmanager.databinding.ActivityMainBinding;
 
 public class MainActivity extends AppCompatActivity {
+    
+    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 1001;
     
     private ActivityMainBinding binding;
     private AuthService authService;
@@ -36,11 +46,16 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         
+        // Request notification permission for Android 13+
+        requestNotificationPermission();
+        
         // Delay navigation setup to ensure fragment is ready
         binding.getRoot().post(() -> {
             setupNavigation();
             // Check and update overdue tasks
             checkOverdueTasks();
+            // Start listening for guild invites
+            startGuildInviteListener();
         });
     }
     
@@ -89,9 +104,41 @@ public class MainActivity extends AppCompatActivity {
         finish();
     }
     
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, 
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS}, 
+                    NOTIFICATION_PERMISSION_REQUEST_CODE);
+            }
+        }
+    }
+    
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                System.out.println("Notification permission granted!");
+            } else {
+                System.out.println("Notification permission denied!");
+            }
+        }
+    }
+    
+    private void startGuildInviteListener() {
+        GuildInviteListenerService.startListening(this);
+        FriendRequestListenerService.startListening(this);
+        FriendshipListenerService.startListening(this);
+    }
+    
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        GuildInviteListenerService.stopListening();
+        FriendRequestListenerService.stopListening();
+        FriendshipListenerService.stopListening();
         binding = null;
     }
 }

@@ -63,7 +63,14 @@ public class FriendsFragment extends Fragment {
         
         setupRecyclerViews();
         setupClickListeners();
+        setupFragmentResultListeners();
         loadData();
+    }
+    
+    private void setupFragmentResultListeners() {
+        getParentFragmentManager().setFragmentResultListener("friend_request_handled", getViewLifecycleOwner(), (requestKey, bundle) -> {
+            loadData();
+        });
     }
     
     private void setupRecyclerViews() {

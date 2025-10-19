@@ -111,3 +111,4 @@ public class GuildMessage {
         isSystemMessage = systemMessage;
     }
 }
+

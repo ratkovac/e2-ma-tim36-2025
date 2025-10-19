@@ -24,6 +24,7 @@ import com.habitrpg.taskmanager.presentation.adapters.GuildMemberAdapter;
 import com.habitrpg.taskmanager.presentation.dialogs.CreateGuildDialog;
 import com.habitrpg.taskmanager.presentation.dialogs.GuildInviteDialog;
 import com.habitrpg.taskmanager.service.GuildService;
+import com.habitrpg.taskmanager.service.GuildMembersListenerService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -75,7 +76,18 @@ public class GuildFragment extends Fragment {
         initializeViews(view);
         setupRecyclerViews();
         setupClickListeners();
+        setupFragmentResultListeners();
         loadData();
+    }
+    
+    private void setupFragmentResultListeners() {
+        getParentFragmentManager().setFragmentResultListener("guild_created", getViewLifecycleOwner(), (requestKey, bundle) -> {
+            loadData();
+        });
+        
+        getParentFragmentManager().setFragmentResultListener("invite_sent", getViewLifecycleOwner(), (requestKey, bundle) -> {
+            Toast.makeText(requireContext(), "Invite sent successfully!", Toast.LENGTH_SHORT).show();
+        });
     }
     
     private void initializeViews(View view) {
@@ -152,6 +164,7 @@ public class GuildFragment extends Fragment {
     private void loadGuildMembers() {
         if (currentGuild == null) {
             // Clear members list when no guild
+            GuildMembersListenerService.stopListening();
             if (getActivity() != null) {
                 getActivity().runOnUiThread(() -> {
                     if (isAdded() && getContext() != null) {
@@ -163,6 +176,23 @@ public class GuildFragment extends Fragment {
             }
             return;
         }
+        
+        GuildMembersListenerService.startListening(requireContext(), currentGuild.getGuildId(), 
+            () -> {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (isAdded() && getContext() != null) {
+                            refreshGuildMembers();
+                        }
+                    });
+                }
+            });
+        
+        refreshGuildMembers();
+    }
+    
+    private void refreshGuildMembers() {
+        if (currentGuild == null) return;
         
         guildService.getGuildMembers(currentGuild.getGuildId(), new GuildService.GuildMemberListCallback() {
             @Override
@@ -272,11 +302,6 @@ public class GuildFragment extends Fragment {
     private void showCreateGuildDialog() {
         CreateGuildDialog dialog = new CreateGuildDialog();
         dialog.show(getParentFragmentManager(), "CreateGuildDialog");
-        
-        // Set up listener for dialog result
-        getParentFragmentManager().setFragmentResultListener("guild_created", this, (requestKey, bundle) -> {
-            loadData(); // Refresh data when guild is created
-        });
     }
     
     private void showInviteFriendsDialog() {
@@ -287,11 +312,6 @@ public class GuildFragment extends Fragment {
         
         GuildInviteDialog dialog = GuildInviteDialog.newInstance(currentGuild.getGuildId());
         dialog.show(getParentFragmentManager(), "GuildInviteDialog");
-        
-        // Set up listener for dialog result
-        getParentFragmentManager().setFragmentResultListener("invite_sent", this, (requestKey, bundle) -> {
-            Toast.makeText(requireContext(), "Invite sent successfully!", Toast.LENGTH_SHORT).show();
-        });
     }
     
     private void navigateToGuildChat() {
@@ -410,5 +430,11 @@ public class GuildFragment extends Fragment {
     public void onResume() {
         super.onResume();
         loadData(); // Refresh data when fragment resumes
+    }
+    
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        GuildMembersListenerService.stopListening();
     }
 }

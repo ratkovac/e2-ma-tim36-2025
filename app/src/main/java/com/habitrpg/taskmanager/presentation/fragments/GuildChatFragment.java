@@ -20,6 +20,7 @@ import com.habitrpg.taskmanager.presentation.adapters.GuildChatAdapter;
 import com.habitrpg.taskmanager.service.AuthService;
 import com.habitrpg.taskmanager.service.GuildService;
 import com.habitrpg.taskmanager.service.UserPreferences;
+import com.habitrpg.taskmanager.service.GuildChatListenerService;
 import com.habitrpg.taskmanager.data.repository.UserRepository;
 
 import java.text.SimpleDateFormat;
@@ -149,6 +150,19 @@ public class GuildChatFragment extends Fragment {
     private void loadMessages() {
         if (currentGuild == null) return;
         
+        GuildChatListenerService.startListening(requireContext(), currentGuild.getGuildId(), 
+            () -> {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(this::refreshMessages);
+                }
+            });
+        
+        refreshMessages();
+    }
+    
+    private void refreshMessages() {
+        if (currentGuild == null) return;
+        
         guildService.getGuildMessages(currentGuild.getGuildId(), new GuildService.GuildMessageCallback() {
             @Override
             public void onSuccess(String message, List<GuildMessage> messageList) {
@@ -222,6 +236,7 @@ public class GuildChatFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        GuildChatListenerService.stopListening();
         binding = null;
     }
 }
