@@ -140,7 +140,94 @@ public class BossService {
     }
     
     /**
-     * Gets the current boss based on defeated bosses count
+     * Gets boss for specific level transition - used when user levels up
+     * This ensures the correct boss is created/retrieved for the level transition
+     */
+    public void getBossForLevelTransition(int userLevel, BossCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        userRepository.getUserById(userId, new UserRepository.UserCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to get user: " + error);
+            }
+            
+            @Override
+            public void onUserRetrieved(User user) {
+                if (user != null) {
+                    new Thread(() -> {
+                        // First, check if there are any undefeated bosses with level LOWER than current boss level
+                        int expectedBossLevel = userLevel - 1; // Boss level for this transition
+                        List<Boss> undefeatedBosses = database.bossDao().getActiveBossesByUser(userId);
+                        
+                        // Filter to only get bosses with level lower than expected boss level
+                        Boss oldestUndefeatedBoss = null;
+                        for (Boss boss : undefeatedBosses) {
+                            if (boss.getLevel() < expectedBossLevel) {
+                                if (oldestUndefeatedBoss == null || boss.getLevel() < oldestUndefeatedBoss.getLevel()) {
+                                    oldestUndefeatedBoss = boss;
+                                }
+                            }
+                        }
+                        
+                        if (oldestUndefeatedBoss != null) {
+                            // Return the oldest undefeated boss (lowest level)
+                            Boss finalBoss = oldestUndefeatedBoss;
+                            callback.onBossRetrieved(finalBoss);
+                            return;
+                        }
+                        
+                        // No old undefeated bosses, check if boss for current level transition exists
+                        Boss currentLevelBoss = database.bossDao().getBossByUserAndLevel(userId, expectedBossLevel);
+                        if (currentLevelBoss != null) {
+                            callback.onBossRetrieved(currentLevelBoss);
+                        } else {
+                            // Create new boss for the current level transition
+                            createBossForLevel(expectedBossLevel, callback);
+                        }
+                    }).start();
+                } else {
+                    callback.onError("User not found");
+                }
+            }
+        });
+    }
+    
+    /**
+     * Gets existing bosses without creating new ones - used for checking if there are bosses to fight
+     */
+    public void getExistingBosses(BossCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+        
+        // Use background thread for database operations
+        new Thread(() -> {
+            // Check if there are any undefeated bosses
+            List<Boss> undefeatedBosses = database.bossDao().getActiveBossesByUser(userId);
+            
+            if (!undefeatedBosses.isEmpty()) {
+                // Return the first undefeated boss (lowest level)
+                Boss firstUndefeatedBoss = undefeatedBosses.get(0);
+                callback.onBossRetrieved(firstUndefeatedBoss);
+            } else {
+                // No undefeated bosses found - return error to indicate no bosses available
+                callback.onError("No bosses available");
+            }
+        }).start();
+    }
+    
+    /**
+     * Gets the current boss - prioritizes undefeated bosses over creating new ones
      */
     public void getCurrentBoss(BossCallback callback) {
         String userId = userPreferences.getCurrentUserId();
@@ -163,7 +250,17 @@ public class BossService {
                 if (user != null) {
                     // Use background thread for database operations
                     new Thread(() -> {
-                        // Calculate boss level based on defeated bosses count
+                        // First, check if there are any undefeated bosses
+                        List<Boss> undefeatedBosses = database.bossDao().getActiveBossesByUser(userId);
+                        
+                        if (!undefeatedBosses.isEmpty()) {
+                            // Return the first undefeated boss (lowest level)
+                            Boss firstUndefeatedBoss = undefeatedBosses.get(0);
+                            callback.onBossRetrieved(firstUndefeatedBoss);
+                            return;
+                        }
+                        
+                        // No undefeated bosses found, create new boss for next level
                         int defeatedBosses = database.bossDao().getDefeatedBossCount(userId);
                         int bossLevel = defeatedBosses + 1; // Next boss to fight
                         
@@ -240,18 +337,20 @@ public class BossService {
                         // Get all tasks for user
                         List<Task> allTasks = database.taskDao().getAllTasksByUser(userId);
                         
-                        // Get all completed tasks for user
-                        List<TaskCompletion> allCompletions = database.taskCompletionDao().getAllCompletionsByUser(userId);
-                        
                         // Debug logging
                         System.out.println("DEBUG: Total tasks: " + allTasks.size());
-                        System.out.println("DEBUG: Total completions: " + allCompletions.size());
                         
-                        // Count valid tasks and completed tasks
+                        // Filter tasks based on stage transition
+                        List<Task> stageTasks = filterTasksByStage(allTasks, previousStageStartTime, currentStageStartTime, user.getLevel());
+                        
+                        // Debug logging
+                        System.out.println("DEBUG: Stage tasks: " + stageTasks.size());
+                        
+                        // Count valid tasks and completed tasks for this stage
                         int validTasks = 0;
                         int completedTasks = 0;
                         
-                        for (Task task : allTasks) {
+                        for (Task task : stageTasks) {
                             String status = task.getStatus();
                             if (!"paused".equals(status) && !"cancelled".equals(status)) {
                                 validTasks++;
@@ -262,10 +361,10 @@ public class BossService {
                         }
                         
                         // Debug logging
-                        System.out.println("DEBUG: Total valid tasks: " + validTasks);
-                        System.out.println("DEBUG: Completed tasks: " + completedTasks);
+                        System.out.println("DEBUG: Stage valid tasks: " + validTasks);
+                        System.out.println("DEBUG: Stage completed tasks: " + completedTasks);
                         
-                        // Calculate success rate based on task status
+                        // Calculate success rate based on task status for this stage
                         int successRate = 0;
                         if (validTasks > 0) {
                             successRate = (completedTasks * 100) / validTasks;
@@ -274,7 +373,7 @@ public class BossService {
                             }
                         }
                         
-                        System.out.println("DEBUG: Final success rate: " + successRate + "%");
+                        System.out.println("DEBUG: Final stage success rate: " + successRate + "%");
                         callback.onSuccess(String.valueOf(successRate));
                     }).start();
                 } else {
@@ -282,6 +381,53 @@ public class BossService {
                 }
             }
         });
+    }
+    
+    /**
+     * Filters tasks based on stage transition logic
+     * - Level 1 to 2: All tasks (no previous stage time)
+     * - Level 2+: Tasks created between previousStageStartTime and currentStageStartTime
+     */
+    private List<Task> filterTasksByStage(List<Task> allTasks, long previousStageStartTime, long currentStageStartTime, int currentLevel) {
+        List<Task> stageTasks = new ArrayList<>();
+        
+        for (Task task : allTasks) {
+            // For level 1 to 2 transition, include all tasks
+            if (currentLevel == 2 && previousStageStartTime == 0) {
+                stageTasks.add(task);
+                continue;
+            }
+            
+            // For level 2+ transitions, filter by stage time period
+            if (currentLevel > 2 && previousStageStartTime > 0) {
+                long taskTimestamp = convertStartDateToTimestamp(task.getStartDate());
+                
+                // Include tasks created between previousStageStartTime and currentStageStartTime
+                if (taskTimestamp >= previousStageStartTime && taskTimestamp < currentStageStartTime) {
+                    stageTasks.add(task);
+                }
+            }
+        }
+        
+        return stageTasks;
+    }
+    
+    /**
+     * Converts start_date string to timestamp for comparison
+     */
+    private long convertStartDateToTimestamp(String startDate) {
+        if (startDate == null || startDate.isEmpty()) {
+            return 0;
+        }
+        
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+            java.util.Date date = sdf.parse(startDate);
+            return date.getTime();
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error parsing start_date: " + startDate + ", error: " + e.getMessage());
+            return 0;
+        }
     }
     
     /**
