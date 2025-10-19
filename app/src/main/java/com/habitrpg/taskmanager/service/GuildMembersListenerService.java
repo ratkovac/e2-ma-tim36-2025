@@ -20,6 +20,7 @@ public class GuildMembersListenerService {
     
     public interface GuildMembersUpdateListener {
         void onMemberAdded();
+        void onMemberRemoved();
     }
     
     public static void startListening(Context context, String guildId, GuildMembersUpdateListener listener) {
@@ -68,6 +69,33 @@ public class GuildMembersListenerService {
                             }
                         } catch (Exception e) {
                             System.out.println("Failed to sync guild member: " + e.getMessage());
+                        }
+                    }).start();
+                }
+                
+                @Override
+                public void onMemberRemoved(String memberId) {
+                    if (guildRepository == null || appContext == null) {
+                        System.out.println("GuildMembersListenerService: Services are null, ignoring member removal");
+                        return;
+                    }
+                    
+                    new Thread(() -> {
+                        try {
+                            if (guildRepository == null) {
+                                return;
+                            }
+                            GuildMember existingMember = guildRepository.getGuildMemberByIdSync(memberId);
+                            if (existingMember != null) {
+                                guildRepository.deactivateGuildMemberSync(memberId);
+                                System.out.println("Guild member removed from local DB: " + memberId);
+                                
+                                if (updateListener != null) {
+                                    updateListener.onMemberRemoved();
+                                }
+                            }
+                        } catch (Exception e) {
+                            System.out.println("Failed to remove guild member: " + e.getMessage());
                         }
                     }).start();
                 }

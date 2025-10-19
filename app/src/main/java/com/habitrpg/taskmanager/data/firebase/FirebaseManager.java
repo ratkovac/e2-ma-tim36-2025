@@ -281,29 +281,45 @@ public class FirebaseManager {
     public ListenerRegistration listenForGuildMembers(String guildId, GuildMembersListener listener) {
         return db.collection("guild_members")
             .whereEqualTo("guildId", guildId)
-            .whereEqualTo("isActive", true)
             .addSnapshotListener((snapshots, error) -> {
                 if (error != null) {
                     listener.onError("Failed to listen for members: " + error.getMessage());
                     return;
                 }
                 
-                if (snapshots != null) {
-                    for (QueryDocumentSnapshot doc : snapshots) {
-                        if (doc.getMetadata().hasPendingWrites()) {
+                if (snapshots != null && !snapshots.isEmpty()) {
+                    for (com.google.firebase.firestore.DocumentChange dc : snapshots.getDocumentChanges()) {
+                        if (dc.getDocument().getMetadata().hasPendingWrites()) {
                             continue;
                         }
                         
-                        Map<String, Object> data = doc.getData();
-                        listener.onMemberAdded(
-                            (String) data.get("memberId"),
-                            (String) data.get("guildId"),
-                            (String) data.get("userId"),
-                            (String) data.get("username"),
-                            (String) data.get("email"),
-                            ((Number) data.get("avatarId")).intValue(),
-                            (Boolean) data.get("isLeader")
-                        );
+                        Map<String, Object> data = dc.getDocument().getData();
+                        String memberId = (String) data.get("memberId");
+                        boolean isActive = data.get("isActive") != null ? (Boolean) data.get("isActive") : true;
+                        
+                        switch (dc.getType()) {
+                            case ADDED:
+                                if (isActive) {
+                                    listener.onMemberAdded(
+                                        memberId,
+                                        (String) data.get("guildId"),
+                                        (String) data.get("userId"),
+                                        (String) data.get("username"),
+                                        (String) data.get("email"),
+                                        ((Number) data.get("avatarId")).intValue(),
+                                        (Boolean) data.get("isLeader")
+                                    );
+                                }
+                                break;
+                            case MODIFIED:
+                                if (!isActive) {
+                                    listener.onMemberRemoved(memberId);
+                                }
+                                break;
+                            case REMOVED:
+                                listener.onMemberRemoved(memberId);
+                                break;
+                        }
                     }
                 }
             });
@@ -312,7 +328,51 @@ public class FirebaseManager {
     public interface GuildMembersListener {
         void onMemberAdded(String memberId, String guildId, String userId, 
                           String username, String email, int avatarId, boolean isLeader);
+        void onMemberRemoved(String memberId);
         void onError(String error);
+    }
+    
+    public void removeGuildMemberDocument(String memberId, OnCompleteListener listener) {
+        db.collection("guild_members")
+            .document(memberId)
+            .update("isActive", false)
+            .addOnCompleteListener(task -> {
+                if (listener != null) {
+                    listener.onComplete(task.isSuccessful(), task.getException());
+                }
+            });
+    }
+    
+    public void disbandGuildDocument(String guildId, OnCompleteListener listener) {
+        // Deactivate guild
+        db.collection("guilds")
+            .document(guildId)
+            .update("isActive", false)
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    // Deactivate all members
+                    db.collection("guild_members")
+                        .whereEqualTo("guildId", guildId)
+                        .get()
+                        .addOnSuccessListener(querySnapshot -> {
+                            for (QueryDocumentSnapshot doc : querySnapshot) {
+                                doc.getReference().update("isActive", false);
+                            }
+                            if (listener != null) {
+                                listener.onComplete(true, null);
+                            }
+                        })
+                        .addOnFailureListener(e -> {
+                            if (listener != null) {
+                                listener.onComplete(false, e);
+                            }
+                        });
+                } else {
+                    if (listener != null) {
+                        listener.onComplete(false, task.getException());
+                    }
+                }
+            });
     }
     
     public void sendGuildMessageDocument(String messageId, String guildId, String userId, 
@@ -515,6 +575,43 @@ public class FirebaseManager {
             .addOnCompleteListener(task -> {
                 if (listener != null) {
                     listener.onComplete(task.isSuccessful(), task.getException());
+                }
+            });
+    }
+    
+    public void removeFriendDocument(String userId, String friendUserId, OnCompleteListener listener) {
+        // Remove friendship from both sides
+        db.collection("friends")
+            .whereEqualTo("userId", userId)
+            .whereEqualTo("friendUserId", friendUserId)
+            .get()
+            .addOnSuccessListener(querySnapshot -> {
+                for (QueryDocumentSnapshot doc : querySnapshot) {
+                    doc.getReference().delete();
+                }
+                
+                // Remove reverse friendship
+                db.collection("friends")
+                    .whereEqualTo("userId", friendUserId)
+                    .whereEqualTo("friendUserId", userId)
+                    .get()
+                    .addOnSuccessListener(reverseSnapshot -> {
+                        for (QueryDocumentSnapshot doc : reverseSnapshot) {
+                            doc.getReference().delete();
+                        }
+                        if (listener != null) {
+                            listener.onComplete(true, null);
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        if (listener != null) {
+                            listener.onComplete(false, e);
+                        }
+                    });
+            })
+            .addOnFailureListener(e -> {
+                if (listener != null) {
+                    listener.onComplete(false, e);
                 }
             });
     }

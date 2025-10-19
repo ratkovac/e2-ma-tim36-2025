@@ -100,6 +100,15 @@ public class FriendRepository {
                 // Remove User2 -> User1 relationship
                 database.friendDao().deleteFriendByUserIdAndFriendId(friendUserId, userId);
                 
+                // Sync with Firebase
+                firebaseManager.removeFriendDocument(userId, friendUserId, 
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to remove friend from Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    });
+                
                 callback.onSuccess("Friend removed successfully");
             } catch (Exception e) {
                 callback.onError("Failed to remove friend: " + e.getMessage());

@@ -178,13 +178,27 @@ public class GuildFragment extends Fragment {
         }
         
         GuildMembersListenerService.startListening(requireContext(), currentGuild.getGuildId(), 
-            () -> {
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        if (isAdded() && getContext() != null) {
-                            refreshGuildMembers();
-                        }
-                    });
+            new GuildMembersListenerService.GuildMembersUpdateListener() {
+                @Override
+                public void onMemberAdded() {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            if (isAdded() && getContext() != null) {
+                                refreshGuildMembers();
+                            }
+                        });
+                    }
+                }
+                
+                @Override
+                public void onMemberRemoved() {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            if (isAdded() && getContext() != null) {
+                                refreshGuildMembers();
+                            }
+                        });
+                    }
                 }
             });
         
@@ -429,7 +443,7 @@ public class GuildFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        loadData(); // Refresh data when fragment resumes
+        loadData();
     }
     
     @Override

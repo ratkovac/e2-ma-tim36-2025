@@ -177,6 +177,15 @@ public class GuildRepository {
                 // Delete all invites
                 guildDao.deleteAllGuildInvites(guildId);
                 
+                // Sync with Firebase
+                firebaseManager.disbandGuildDocument(guildId, 
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to disband guild in Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    });
+                
                 callback.onSuccess("Guild disbanded successfully", guild);
             } catch (Exception e) {
                 callback.onError("Failed to disband guild: " + e.getMessage());
@@ -246,6 +255,15 @@ public class GuildRepository {
                 // Update member count
                 int newCount = guildDao.getGuildMemberCount(guild.getGuildId());
                 guildDao.updateGuildMemberCount(guild.getGuildId(), newCount);
+                
+                // Sync with Firebase
+                firebaseManager.removeGuildMemberDocument(member.getMemberId(), 
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to remove member from Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    });
                 
                 callback.onSuccess("Left guild successfully", guild);
             } catch (Exception e) {
@@ -518,6 +536,14 @@ public class GuildRepository {
             guildDao.insertGuildMember(member);
         } catch (Exception e) {
             android.util.Log.e("GuildRepository", "Error inserting guild member: " + e.getMessage());
+        }
+    }
+    
+    public void deactivateGuildMemberSync(String memberId) {
+        try {
+            guildDao.deactivateGuildMember(memberId);
+        } catch (Exception e) {
+            android.util.Log.e("GuildRepository", "Error deactivating guild member: " + e.getMessage());
         }
     }
     
