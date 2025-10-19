@@ -115,31 +115,24 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:orientation="vertical"
+            android:orientation="horizontal"
             android:gravity="center"
             android:background="@drawable/text_background"
             android:padding="12dp"
             android:layout_marginEnd="8dp">
 
-            <ImageView
-                android:id="@+id/equipment_icon"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginBottom="4dp"
-                android:background="@drawable/equipment_placeholder"
-                android:contentDescription="Equipment"
-                android:scaleType="centerCrop"
-                android:visibility="visible" />
-
+            <!-- Equipment icons will be added dynamically here -->
+            <!-- Or "Nema opreme" text when no equipment -->
             <TextView
-                android:id="@+id/equipment_name"
+                android:id="@+id/no_equipment_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Magic Sword"
+                android:text="Nema opreme"
                 android:textColor="@color/white"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:gravity="center" />
+                android:gravity="center"
+                android:visibility="gone" />
 
         </LinearLayout>
 

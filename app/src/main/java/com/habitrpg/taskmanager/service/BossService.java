@@ -337,18 +337,20 @@ public class BossService {
                         // Get all tasks for user
                         List<Task> allTasks = database.taskDao().getAllTasksByUser(userId);
                         
-                        // Get all completed tasks for user
-                        List<TaskCompletion> allCompletions = database.taskCompletionDao().getAllCompletionsByUser(userId);
-                        
                         // Debug logging
                         System.out.println("DEBUG: Total tasks: " + allTasks.size());
-                        System.out.println("DEBUG: Total completions: " + allCompletions.size());
                         
-                        // Count valid tasks and completed tasks
+                        // Filter tasks based on stage transition
+                        List<Task> stageTasks = filterTasksByStage(allTasks, previousStageStartTime, currentStageStartTime, user.getLevel());
+                        
+                        // Debug logging
+                        System.out.println("DEBUG: Stage tasks: " + stageTasks.size());
+                        
+                        // Count valid tasks and completed tasks for this stage
                         int validTasks = 0;
                         int completedTasks = 0;
                         
-                        for (Task task : allTasks) {
+                        for (Task task : stageTasks) {
                             String status = task.getStatus();
                             if (!"paused".equals(status) && !"cancelled".equals(status)) {
                                 validTasks++;
@@ -359,10 +361,10 @@ public class BossService {
                         }
                         
                         // Debug logging
-                        System.out.println("DEBUG: Total valid tasks: " + validTasks);
-                        System.out.println("DEBUG: Completed tasks: " + completedTasks);
+                        System.out.println("DEBUG: Stage valid tasks: " + validTasks);
+                        System.out.println("DEBUG: Stage completed tasks: " + completedTasks);
                         
-                        // Calculate success rate based on task status
+                        // Calculate success rate based on task status for this stage
                         int successRate = 0;
                         if (validTasks > 0) {
                             successRate = (completedTasks * 100) / validTasks;
@@ -371,7 +373,7 @@ public class BossService {
                             }
                         }
                         
-                        System.out.println("DEBUG: Final success rate: " + successRate + "%");
+                        System.out.println("DEBUG: Final stage success rate: " + successRate + "%");
                         callback.onSuccess(String.valueOf(successRate));
                     }).start();
                 } else {
@@ -379,6 +381,53 @@ public class BossService {
                 }
             }
         });
+    }
+    
+    /**
+     * Filters tasks based on stage transition logic
+     * - Level 1 to 2: All tasks (no previous stage time)
+     * - Level 2+: Tasks created between previousStageStartTime and currentStageStartTime
+     */
+    private List<Task> filterTasksByStage(List<Task> allTasks, long previousStageStartTime, long currentStageStartTime, int currentLevel) {
+        List<Task> stageTasks = new ArrayList<>();
+        
+        for (Task task : allTasks) {
+            // For level 1 to 2 transition, include all tasks
+            if (currentLevel == 2 && previousStageStartTime == 0) {
+                stageTasks.add(task);
+                continue;
+            }
+            
+            // For level 2+ transitions, filter by stage time period
+            if (currentLevel > 2 && previousStageStartTime > 0) {
+                long taskTimestamp = convertStartDateToTimestamp(task.getStartDate());
+                
+                // Include tasks created between previousStageStartTime and currentStageStartTime
+                if (taskTimestamp >= previousStageStartTime && taskTimestamp < currentStageStartTime) {
+                    stageTasks.add(task);
+                }
+            }
+        }
+        
+        return stageTasks;
+    }
+    
+    /**
+     * Converts start_date string to timestamp for comparison
+     */
+    private long convertStartDateToTimestamp(String startDate) {
+        if (startDate == null || startDate.isEmpty()) {
+            return 0;
+        }
+        
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+            java.util.Date date = sdf.parse(startDate);
+            return date.getTime();
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error parsing start_date: " + startDate + ", error: " + e.getMessage());
+            return 0;
+        }
     }
     
     /**

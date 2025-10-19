@@ -45,8 +45,8 @@ public class BossFightFragment extends Fragment {
     private TextView playerPpText;
     private ProgressBar playerPpBar;
     private ImageView bossImage;
-    private ImageView equipmentIcon;
-    private TextView equipmentName;
+    private LinearLayout equipmentContainer;
+    private TextView noEquipmentText;
     private TextView attackCounter;
     private TextView successChanceText;
     private MaterialButton attackButton;
@@ -113,8 +113,8 @@ public class BossFightFragment extends Fragment {
         playerPpText = view.findViewById(R.id.player_pp_text);
         playerPpBar = view.findViewById(R.id.player_pp_bar);
         bossImage = view.findViewById(R.id.boss_image);
-        equipmentIcon = view.findViewById(R.id.equipment_icon);
-        equipmentName = view.findViewById(R.id.equipment_name);
+        equipmentContainer = view.findViewById(R.id.equipment_container);
+        noEquipmentText = view.findViewById(R.id.no_equipment_text);
         attackCounter = view.findViewById(R.id.attack_counter);
         successChanceText = view.findViewById(R.id.success_chance_text);
         attackButton = view.findViewById(R.id.attack_button);
@@ -187,6 +187,7 @@ public class BossFightFragment extends Fragment {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         calculateEquipmentBonuses(equipment);
+                        updateEquipmentDisplay();
                         loadCurrentBoss();
                     });
                 }
@@ -327,9 +328,8 @@ public class BossFightFragment extends Fragment {
         }
         successChanceText.setText(totalSuccessChance + "%" + (bonusSuccessChance > 0 ? " (+" + bonusSuccessChance + "%)" : ""));
 
-        // Update equipment display (placeholder for now)
-        equipmentName.setText("Magic Sword");
-        equipmentIcon.setVisibility(View.VISIBLE);
+        // Update equipment display with active equipment icons
+        updateEquipmentDisplay();
 
         // Update potential rewards display
         updatePotentialRewards();
@@ -350,6 +350,111 @@ public class BossFightFragment extends Fragment {
         // Update the rewards text
         String rewardsText = "Potencijalne nagrade:\n+" + potentialCoinReward + " novčića";
         potentialRewardsText.setText(rewardsText);
+    }
+
+    /**
+     * Update equipment display with active equipment icons
+     */
+    private void updateEquipmentDisplay() {
+        if (equipmentContainer == null || noEquipmentText == null) {
+            return;
+        }
+
+        // Clear existing equipment icons (but keep the noEquipmentText)
+        // Remove all views except noEquipmentText
+        for (int i = equipmentContainer.getChildCount() - 1; i >= 0; i--) {
+            if (equipmentContainer.getChildAt(i) != noEquipmentText) {
+                equipmentContainer.removeViewAt(i);
+            }
+        }
+
+        // Hide no equipment text initially
+        noEquipmentText.setVisibility(View.GONE);
+
+        // Get active equipment and display their icons
+        equipmentService.getActiveEquipment(new EquipmentService.EquipmentCallback() {
+            @Override
+            public void onSuccess(String message, List<Equipment> equipment) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        boolean hasActiveEquipment = false;
+                        
+                        for (Equipment item : equipment) {
+                            if (item.isActive()) {
+                                hasActiveEquipment = true;
+                                
+                                ImageView equipmentIcon = new ImageView(requireContext());
+                                equipmentIcon.setLayoutParams(new LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT
+                                ));
+                                
+                                // Set icon size
+                                int iconSize = (int) (32 * getResources().getDisplayMetrics().density);
+                                equipmentIcon.getLayoutParams().width = iconSize;
+                                equipmentIcon.getLayoutParams().height = iconSize;
+                                
+                                // Add margin between icons
+                                LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) equipmentIcon.getLayoutParams();
+                                params.setMargins(0, 0, (int) (8 * getResources().getDisplayMetrics().density), 0);
+                                equipmentIcon.setLayoutParams(params);
+                                
+                                // Set the icon resource
+                                int iconResource = getIconResource(item.getIconResource());
+                                equipmentIcon.setImageResource(iconResource);
+                                equipmentIcon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                                equipmentIcon.setContentDescription(item.getEquipmentName());
+                                
+                                equipmentContainer.addView(equipmentIcon);
+                            }
+                        }
+                        
+                        // Show "Nema opreme" text if no active equipment
+                        if (!hasActiveEquipment) {
+                            noEquipmentText.setVisibility(View.VISIBLE);
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                // Show "Nema opreme" text if there's an error loading equipment
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        noEquipmentText.setVisibility(View.VISIBLE);
+                    });
+                }
+            }
+        });
+    }
+
+    /**
+     * Convert iconResource string to drawable resource ID
+     */
+    private int getIconResource(String iconResourceName) {
+        switch (iconResourceName) {
+            case "ic_potion1":
+                return R.drawable.ic_potion1;
+            case "ic_potion2":
+                return R.drawable.ic_potion2;
+            case "ic_potion3":
+                return R.drawable.ic_potion3;
+            case "ic_potion4":
+                return R.drawable.ic_potion4;
+            case "ic_gloves":
+                return R.drawable.ic_gloves;
+            case "ic_shield":
+                return R.drawable.ic_shield;
+            case "ic_boots":
+                return R.drawable.ic_boots;
+            case "ic_sword":
+                return R.drawable.ic_sword;
+            case "ic_bow":
+                return R.drawable.ic_bow;
+            default:
+                return R.drawable.ic_potion1; // Default icon
+        }
     }
 
     private void performAttack() {
