@@ -52,4 +52,8 @@
     <color name="boss_border_color">#5D4037</color>
     <color name="equipment_placeholder_color">#FFC107</color>
     <color name="equipment_border_color">#FF8F00</color>
+    
+    <!-- Additional Colors -->
+    <color name="light_gray">#F5F5F5</color>
+    <color name="accent_color">#03DAC6</color>
 </resources>

@@ -65,8 +65,29 @@
         android:label="Guild Chat" />
 
     <fragment
+        android:id="@+id/navigation_shop"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.ShopFragment"
+        android:label="Shop" />
+
+    <fragment
+        android:id="@+id/navigation_equipment"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.EquipmentDisplayFragment"
+        android:label="Equipment" />
+
+    <fragment
         android:id="@+id/navigation_boss_fight"
         android:name="com.habitrpg.taskmanager.presentation.fragments.BossFightFragment"
         android:label="Boss Fight" />
+
+    <fragment
+        android:id="@+id/navigation_pre_boss_inventory"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.PreBossInventoryFragment"
+        android:label="Prepare for Boss">
+        <action
+            android:id="@+id/action_preBossInventory_to_bossFight"
+            app:destination="@id/navigation_boss_fight"
+            app:popUpTo="@id/navigation_tasks"
+            app:popUpToInclusive="false" />
+    </fragment>
 
 </navigation>

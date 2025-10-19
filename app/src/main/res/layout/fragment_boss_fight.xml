@@ -215,7 +215,7 @@
         android:layout_width="80dp"
         android:layout_height="80dp"
         android:layout_marginEnd="32dp"
-        android:layout_marginBottom="32dp"
+        android:layout_marginBottom="80dp"
         android:text="⚔"
         android:textSize="24sp"
         app:backgroundTint="@color/attack_button_color"
