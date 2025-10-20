@@ -18,12 +18,14 @@ public class FriendService {
     private UserRepository userRepository;
     private FirebaseManager firebaseManager;
     private UserPreferences userPreferences;
+    private NotificationService notificationService;
     
     private FriendService(Context context) {
         friendRepository = FriendRepository.getInstance(context);
         userRepository = UserRepository.getInstance(context);
         firebaseManager = FirebaseManager.getInstance();
         userPreferences = UserPreferences.getInstance(context);
+        notificationService = NotificationService.getInstance(context);
     }
     
     public static synchronized FriendService getInstance(Context context) {
@@ -234,6 +236,10 @@ public class FriendService {
         friendRepository.sendFriendRequest(request, new FriendRepository.FriendRequestCallback() {
             @Override
             public void onSuccess(String message) {
+                // Local demo echo: immediately show notification on this device as if recipient received it
+                if (notificationService != null) {
+                    notificationService.showFriendRequestNotification(request);
+                }
                 callback.onSuccess("Friend request sent successfully");
             }
             
