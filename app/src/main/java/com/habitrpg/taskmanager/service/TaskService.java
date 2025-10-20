@@ -1141,27 +1141,32 @@ public class TaskService {
                     return;
                 }
                 
-                // Briši zadatak (bilo da je ponavljajući ili obični)
-                taskRepository.deleteTask(taskId, new TaskRepository.TaskCallback() {
-                    @Override
-                    public void onSuccess(String message) {
-                        callback.onSuccess("Task deleted successfully");
-                    }
-                    
-                    @Override
-                    public void onError(String error) {
-                        callback.onError(error);
-                    }
-                    
-                    @Override
-                    public void onTaskRetrieved(Task task) {}
-                    
-                    @Override
-                    public void onTasksRetrieved(List<Task> tasks) {}
-                    
-                    @Override
-                    public void onTaskCountRetrieved(int count) {}
-                });
+                // Proveri da li je ponavljajući zadatak
+                if (task.isRecurring()) {
+                    deleteRecurringTaskAndFutureInstances(task, callback);
+                } else {
+                    // Briši obični zadatak
+                    taskRepository.deleteTask(taskId, new TaskRepository.TaskCallback() {
+                        @Override
+                        public void onSuccess(String message) {
+                            callback.onSuccess("Task deleted successfully");
+                        }
+                        
+                        @Override
+                        public void onError(String error) {
+                            callback.onError(error);
+                        }
+                        
+                        @Override
+                        public void onTaskRetrieved(Task task) {}
+                        
+                        @Override
+                        public void onTasksRetrieved(List<Task> tasks) {}
+                        
+                        @Override
+                        public void onTaskCountRetrieved(int count) {}
+                    });
+                }
             }
             
             @Override
@@ -1170,6 +1175,146 @@ public class TaskService {
             @Override
             public void onTaskCountRetrieved(int count) {}
         });
+    }
+    
+    private void deleteRecurringTaskAndFutureInstances(Task task, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        
+        // Prvo obriši trenutni zadatak
+        taskRepository.deleteTask(task.getId(), new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {
+                // Sada pronađi i obriši sve buduće instance
+                findAndDeleteFutureRecurringInstances(task, callback);
+            }
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to delete recurring task: " + error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private void findAndDeleteFutureRecurringInstances(Task originalTask, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        
+        // Uzmi sve zadatke korisnika
+        taskRepository.getAllTasks(userId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to get tasks for deletion: " + error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> allTasks) {
+                if (allTasks == null) {
+                    callback.onSuccess("Recurring task and future instances deleted successfully");
+                    return;
+                }
+                
+                // Pronađi sve buduće instance ponavljajućeg zadatka
+                List<Task> tasksToDelete = new java.util.ArrayList<>();
+                String currentDate = DateUtils.getCurrentDateString();
+                
+                // Izvuci osnovni naziv zadatka (bez datuma u zagradama)
+                String baseTaskName = extractBaseTaskName(originalTask.getName());
+                
+                for (Task task : allTasks) {
+                    // Proveri da li je ponavljajući zadatak
+                    if (!task.isRecurring()) {
+                        continue;
+                    }
+                    
+                    // Proveri da li ima isti osnovni naziv
+                    String taskBaseName = extractBaseTaskName(task.getName());
+                    if (!baseTaskName.equals(taskBaseName)) {
+                        continue;
+                    }
+                    
+                    // Proveri da li je budući zadatak (ne završen)
+                    if ("completed".equals(task.getStatus())) {
+                        continue; // Ne briši završene zadatke
+                    }
+                    
+                    // Proveri da li je datum u budućnosti ili danas
+                    if (task.getStartDate() != null && !task.getStartDate().isEmpty()) {
+                        String taskDate = task.getStartDate().split(" ")[0]; // Uzmi samo datum
+                        if (taskDate.compareTo(currentDate) >= 0) {
+                            tasksToDelete.add(task);
+                        }
+                    }
+                }
+                
+                // Obriši sve pronađene buduće instance
+                deleteTasksInBatch(tasksToDelete, callback);
+            }
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private String extractBaseTaskName(String taskName) {
+        // Ukloni datum u zagradama sa kraja naziva
+        // Primer: "Trčanje (2025-01-15)" -> "Trčanje"
+        if (taskName != null && taskName.contains(" (")) {
+            int lastParenIndex = taskName.lastIndexOf(" (");
+            if (lastParenIndex > 0) {
+                return taskName.substring(0, lastParenIndex).trim();
+            }
+        }
+        return taskName;
+    }
+    
+    private void deleteTasksInBatch(List<Task> tasksToDelete, TaskCallback callback) {
+        if (tasksToDelete.isEmpty()) {
+            callback.onSuccess("Recurring task and future instances deleted successfully");
+            return;
+        }
+        
+        final int[] deletedCount = {0};
+        final int totalTasks = tasksToDelete.size();
+        
+        for (Task task : tasksToDelete) {
+            taskRepository.deleteTask(task.getId(), new TaskRepository.TaskCallback() {
+                @Override
+                public void onSuccess(String message) {
+                    deletedCount[0]++;
+                    if (deletedCount[0] == totalTasks) {
+                        callback.onSuccess("Recurring task and " + totalTasks + " future instances deleted successfully");
+                    }
+                }
+                
+                @Override
+                public void onError(String error) {
+                    callback.onError("Failed to delete some recurring task instances: " + error);
+                }
+                
+                @Override
+                public void onTaskRetrieved(Task task) {}
+                
+                @Override
+                public void onTasksRetrieved(List<Task> tasks) {}
+                
+                @Override
+                public void onTaskCountRetrieved(int count) {}
+            });
+        }
     }
     
     public String getCurrentUserId() {
