@@ -49,14 +49,8 @@ public class TaskService {
             task.setStartDate(DateUtils.getCurrentDateTimeString());
         }
         
-        validateTaskQuota(task, isValid -> {
-            if (!isValid) {
-                callback.onError("Task quota limit exceeded for this difficulty/importance combination");
-                return;
-            }
-            
-            // Get user level for XP calculation
-            userRepository.getUserById(userId, new UserRepository.UserCallback() {
+        // Get user level for XP calculation
+        userRepository.getUserById(userId, new UserRepository.UserCallback() {
                 @Override
                 public void onSuccess(String message) {}
                 
@@ -82,7 +76,6 @@ public class TaskService {
                     }
                 }
             });
-        });
     }
     
     private void createSingleTask(Task task, TaskCallback callback) {
@@ -241,52 +234,62 @@ public class TaskService {
                     return;
                 }
                 
-                taskRepository.updateTaskStatus(taskId, "completed", new TaskRepository.TaskCallback() {
+                // Proverava kvote pre završavanja zadatka
+                validateTaskQuota(task, new QuotaValidationCallback() {
                     @Override
-                    public void onSuccess(String message) {
-                        String currentDate = DateUtils.getCurrentDateString();
-                        TaskCompletion completion = new TaskCompletion(taskId, currentDate, task.getXpValue());
+                    public void onValidationResult(boolean isValid) {
+                        if (!isValid) {
+                            callback.onError("Cannot complete task - quota limit reached for this difficulty/importance combination");
+                            return;
+                        }
                         
-                        taskRepository.insertTaskCompletion(completion, new TaskRepository.TaskCallback() {
+                        // Kvota je u redu, nastavi sa završavanjem zadatka
+                        taskRepository.updateTaskStatus(taskId, "completed", new TaskRepository.TaskCallback() {
                             @Override
                             public void onSuccess(String message) {
-                                // Update special mission progress for task completion (non-blocking)
-                                String difficulty = task.getDifficulty();
-                                String importance = task.getImportance();
-                                specialMissionRepository.recordTaskCompletion(userId, difficulty, importance,
-                                    new com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.ProgressUpdateCallback() {
-                                        @Override public void onUpdated(String msg) { /* no-op */ }
-                                        @Override public void onNoActiveMission() { /* no-op */ }
-                                        @Override public void onError(String error) { /* no-op */ }
-                                    }
-                                );
+                                String currentDate = DateUtils.getCurrentDateString();
+                                TaskCompletion completion = new TaskCompletion(taskId, currentDate, task.getXpValue());
                                 
-                                updateUserXP(task, callback);
+                                taskRepository.insertTaskCompletion(completion, new TaskRepository.TaskCallback() {
+                                    @Override
+                                    public void onSuccess(String message) {
+                                        // Update special mission progress for task completion (non-blocking)
+                                        String difficulty = task.getDifficulty();
+                                        String importance = task.getImportance();
+                                        specialMissionRepository.recordTaskCompletion(userId, difficulty, importance,
+                                            new com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.ProgressUpdateCallback() {
+                                                @Override public void onUpdated(String msg) { /* no-op */ }
+                                                @Override public void onNoActiveMission() { /* no-op */ }
+                                                @Override public void onError(String error) { /* no-op */ }
+                                            }
+                                        );
+                                        
+                                        updateUserXP(task, callback);
 
-                                // Periodically check and apply no-unresolved-tasks bonus
-                                specialMissionRepository.checkAndApplyNoUnresolvedTasksBonus(userId,
-                                    new com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.ProgressUpdateCallback() {
-                                        @Override public void onUpdated(String msg) { /* no-op */ }
-                                        @Override public void onNoActiveMission() { /* no-op */ }
-                                        @Override public void onError(String error) { /* no-op */ }
+                                        // Periodically check and apply no-unresolved-tasks bonus
+                                        specialMissionRepository.checkAndApplyNoUnresolvedTasksBonus(userId,
+                                            new com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.ProgressUpdateCallback() {
+                                                @Override public void onUpdated(String msg) { /* no-op */ }
+                                                @Override public void onNoActiveMission() { /* no-op */ }
+                                                @Override public void onError(String error) { /* no-op */ }
+                                            }
+                                        );
                                     }
-                                );
-                            }
-                            
-                            @Override
-                            public void onError(String error) {
-                                callback.onError("Failed to record completion: " + error);
-                            }
-                            
-                            @Override
-                            public void onTaskRetrieved(Task task) {}
-                            
-                            @Override
-                            public void onTasksRetrieved(List<Task> tasks) {}
-                            
-                            @Override
-                            public void onTaskCountRetrieved(int count) {}
-                        });
+                                    
+                                    @Override
+                                    public void onError(String error) {
+                                        callback.onError("Failed to record completion: " + error);
+                                    }
+                                    
+                                    @Override
+                                    public void onTaskRetrieved(Task task) {}
+                                    
+                                    @Override
+                                    public void onTasksRetrieved(List<Task> tasks) {}
+                                    
+                                    @Override
+                                    public void onTaskCountRetrieved(int count) {}
+                                });
                     }
                     
                     @Override
@@ -302,6 +305,9 @@ public class TaskService {
                     
                     @Override
                     public void onTaskCountRetrieved(int count) {}
+                });
+                    }
+
                 });
             }
             
@@ -325,6 +331,117 @@ public class TaskService {
             callback.onSuccess("Task status updated (no XP awarded for " + task.getStatus() + " tasks)");
             return;
         }
+        
+        // Kvota se sada proverava pre završavanja zadatka, tako da ovde direktno dodeljujemo XP
+        awardXPToUser(task, callback);
+    }
+    
+    private void checkTaskQuotaForXP(Task task, QuotaValidationCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        String difficulty = task.getDifficulty();
+        String importance = task.getImportance();
+        
+        // Get all completed tasks for this user
+        taskRepository.getAllTasks(userId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onValidationResult(false);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> allTasks) {
+                if (allTasks == null) {
+                    callback.onValidationResult(true);
+                    return;
+                }
+                
+                // Count completed tasks with same difficulty and importance
+                int completedCount = 0;
+                String currentDate = DateUtils.getCurrentDateString();
+                String[] currentWeekDates = DateUtils.getCurrentWeekDates();
+                String[] currentMonthDates = DateUtils.getCurrentMonthDates();
+                
+                for (Task t : allTasks) {
+                    if (!"completed".equals(t.getStatus())) {
+                        continue; // Skip non-completed tasks
+                    }
+                    
+                    if (!t.getUserId().equals(userId)) {
+                        continue; // Skip tasks from other users
+                    }
+                    
+                    // Check if this completed task matches the current task's difficulty/importance
+                    boolean matchesDifficulty = t.getDifficulty().equals(difficulty);
+                    boolean matchesImportance = t.getImportance().equals(importance);
+                    
+                    if (matchesDifficulty && matchesImportance) {
+                        // Check if it's within the time period for quota
+                        String taskDate = t.getStartDate();
+                        if (taskDate != null && !taskDate.isEmpty()) {
+                            String taskDateOnly = taskDate.split(" ")[0]; // Extract date part
+                            
+                            if ("very_easy".equals(difficulty) && "normal".equals(importance)) {
+                                // Daily limit: 5
+                                if (taskDateOnly.equals(currentDate)) {
+                                    completedCount++;
+                                }
+                            } else if ("easy".equals(difficulty) && "important".equals(importance)) {
+                                // Daily limit: 5
+                                if (taskDateOnly.equals(currentDate)) {
+                                    completedCount++;
+                                }
+                            } else if ("hard".equals(difficulty) && "very_important".equals(importance)) {
+                                // Daily limit: 2
+                                if (taskDateOnly.equals(currentDate)) {
+                                    completedCount++;
+                                }
+                            } else if ("extreme".equals(difficulty)) {
+                                // Weekly limit: 1
+                                if (taskDateOnly.compareTo(currentWeekDates[0]) >= 0 && 
+                                    taskDateOnly.compareTo(currentWeekDates[1]) <= 0) {
+                                    completedCount++;
+                                }
+                            } else if ("special".equals(importance)) {
+                                // Monthly limit: 1
+                                if (taskDateOnly.compareTo(currentMonthDates[0]) >= 0 && 
+                                    taskDateOnly.compareTo(currentMonthDates[1]) <= 0) {
+                                    completedCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Check if quota is exceeded
+                boolean quotaExceeded = false;
+                if ("very_easy".equals(difficulty) && "normal".equals(importance) && completedCount >= 5) {
+                    quotaExceeded = true;
+                } else if ("easy".equals(difficulty) && "important".equals(importance) && completedCount >= 5) {
+                    quotaExceeded = true;
+                } else if ("hard".equals(difficulty) && "very_important".equals(importance) && completedCount >= 2) {
+                    quotaExceeded = true;
+                } else if ("extreme".equals(difficulty) && completedCount >= 1) {
+                    quotaExceeded = true;
+                } else if ("special".equals(importance) && completedCount >= 1) {
+                    quotaExceeded = true;
+                }
+                
+                callback.onValidationResult(!quotaExceeded);
+            }
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private void awardXPToUser(Task task, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
         
         userRepository.getUserById(userId, new UserRepository.UserCallback() {
             @Override
@@ -447,6 +564,11 @@ public class TaskService {
             return;
         }
         
+        // Proceed with update directly - no quota validation needed
+        performTaskUpdate(task, callback);
+    }
+    
+    private void performTaskUpdate(Task task, TaskCallback callback) {
         int xpValue = XPService.calculateTaskXP(task.getDifficulty(), task.getImportance());
         task.setXpValue(xpValue);
         
@@ -697,7 +819,30 @@ public class TaskService {
     }
     
     public void getTaskCountByDifficultyAndImportanceForDate(String userId, String difficulty, String importance, String date, TaskCountCallback callback) {
-        taskRepository.getTaskCountByDifficultyAndImportanceForDate(userId, difficulty, importance, date, new TaskRepository.TaskCallback() {
+        taskRepository.getCompletedTaskCountByDifficultyAndImportanceForDate(userId, difficulty, importance, date, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {
+                callback.onTaskCountRetrieved(count);
+            }
+        });
+    }
+    
+    public void getCompletedTaskCountByDifficultyAndImportanceForDate(String userId, String difficulty, String importance, String date, TaskCountCallback callback) {
+        taskRepository.getCompletedTaskCountByDifficultyAndImportanceForDate(userId, difficulty, importance, date, new TaskRepository.TaskCallback() {
             @Override
             public void onSuccess(String message) {}
             
@@ -720,7 +865,30 @@ public class TaskService {
     }
     
     public void getExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd, TaskCountCallback callback) {
-        taskRepository.getExtremeTaskCountForWeek(userId, weekStart, weekEnd, new TaskRepository.TaskCallback() {
+        taskRepository.getCompletedExtremeTaskCountForWeek(userId, weekStart, weekEnd, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {
+                callback.onTaskCountRetrieved(count);
+            }
+        });
+    }
+    
+    public void getCompletedExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd, TaskCountCallback callback) {
+        taskRepository.getCompletedExtremeTaskCountForWeek(userId, weekStart, weekEnd, new TaskRepository.TaskCallback() {
             @Override
             public void onSuccess(String message) {}
             
@@ -743,7 +911,30 @@ public class TaskService {
     }
     
     public void getSpecialTaskCountForMonth(String userId, String monthStart, String monthEnd, TaskCountCallback callback) {
-        taskRepository.getSpecialTaskCountForMonth(userId, monthStart, monthEnd, new TaskRepository.TaskCallback() {
+        taskRepository.getCompletedSpecialTaskCountForMonth(userId, monthStart, monthEnd, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {
+                callback.onTaskCountRetrieved(count);
+            }
+        });
+    }
+    
+    public void getCompletedSpecialTaskCountForMonth(String userId, String monthStart, String monthEnd, TaskCountCallback callback) {
+        taskRepository.getCompletedSpecialTaskCountForMonth(userId, monthStart, monthEnd, new TaskRepository.TaskCallback() {
             @Override
             public void onSuccess(String message) {}
             
@@ -814,7 +1005,7 @@ public class TaskService {
             getExtremeTaskCountForWeek(userId, weekDates[0], weekDates[1], new TaskCountCallback() {
                 @Override
                 public void onTaskCountRetrieved(int weeklyCount) {
-                    if (weeklyCount >= 1) {
+                    if (weeklyCount >= 5 /*treba  1*/) {
                         callback.onValidationResult(false);
                         return;
                     }
@@ -840,7 +1031,7 @@ public class TaskService {
             getSpecialTaskCountForMonth(userId, monthDates[0], monthDates[1], new TaskCountCallback() {
                 @Override
                 public void onTaskCountRetrieved(int monthlyCount) {
-                    if (monthlyCount >= 1) {
+                    if (monthlyCount >= 5 /*treba 1*/) {
                         callback.onValidationResult(false);
                         return;
                     }

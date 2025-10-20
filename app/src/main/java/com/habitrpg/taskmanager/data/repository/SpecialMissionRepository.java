@@ -7,6 +7,9 @@ import com.habitrpg.taskmanager.data.database.dao.GuildDao;
 import com.habitrpg.taskmanager.data.database.dao.SpecialMissionDao;
 import com.habitrpg.taskmanager.data.database.dao.SpecialMissionProgressDao;
 import com.habitrpg.taskmanager.data.database.dao.TaskDao;
+import com.habitrpg.taskmanager.data.database.dao.UserDao;
+import com.habitrpg.taskmanager.data.database.dao.EquipmentDao;
+import com.habitrpg.taskmanager.data.database.dao.UserStatisticsDao;
 import com.habitrpg.taskmanager.data.database.entities.Guild;
 import com.habitrpg.taskmanager.data.database.entities.GuildMember;
 import com.habitrpg.taskmanager.data.database.entities.SpecialMission;
@@ -80,11 +83,20 @@ public class SpecialMissionRepository {
 		void onError(String error);
 	}
 
+    public interface FinalizeCallback {
+        void onCompleted(String message);
+        void onNoAction();
+        void onError(String error);
+    }
+
 	private static SpecialMissionRepository instance;
 	private final GuildDao guildDao;
 	private final SpecialMissionDao specialMissionDao;
 	private final SpecialMissionProgressDao progressDao;
-	private final TaskDao taskDao;
+    private final TaskDao taskDao;
+    private final UserDao userDao;
+    private final EquipmentDao equipmentDao;
+    private final UserStatisticsDao userStatisticsDao;
 	private ExecutorService executor;
 
 	private SpecialMissionRepository(Context context) {
@@ -92,7 +104,10 @@ public class SpecialMissionRepository {
 		this.guildDao = db.guildDao();
 		this.specialMissionDao = db.specialMissionDao();
 		this.progressDao = db.specialMissionProgressDao();
-		this.taskDao = db.taskDao();
+        this.taskDao = db.taskDao();
+        this.userDao = db.userDao();
+        this.equipmentDao = db.equipmentDao();
+        this.userStatisticsDao = db.userStatisticsDao();
 		this.executor = Executors.newSingleThreadExecutor();
 	}
 
@@ -205,7 +220,7 @@ public class SpecialMissionRepository {
 				progress.setShopPurchases(progress.getShopPurchases() + 1);
 				progress.setTotalDamageDealt(progress.getTotalDamageDealt() + damage);
 				progressDao.insert(progress);
-
+				System.out.println("Shop purchase recorded for userId: " + userId + " on missionId: " + mission.getId());
 				callback.onUpdated("Special mission progress updated: -2 HP");
 			} catch (Exception e) {
 				callback.onError("Failed to update mission progress: " + e.getMessage());
@@ -562,6 +577,7 @@ public class SpecialMissionRepository {
 						mp.hasNoUnresolvedTasks = false;
 						mp.daysWithMessagesCount = 0;
 					}
+
 					int hpFromShop = mp.shopPurchases * 2;
 					int hpFromHits = mp.regularBossHits * 2;
 					int hpFromEasy = mp.easyTasksCompleted * 1;
@@ -578,6 +594,98 @@ public class SpecialMissionRepository {
 			}
 		});
 	}
+
+	// Finalize a mission for a given guild if endDate passed; grant rewards if victory
+	public void finalizeIfExpiredForGuild(String guildId, FinalizeCallback callback) {
+		ensureExecutorActive();
+		executor.execute(() -> {
+			try {
+				SpecialMission mission = specialMissionDao.getActiveMissionByGuild(guildId);
+				if (mission == null) { callback.onNoAction(); return; }
+				long now = System.currentTimeMillis();
+				if (now < mission.getEndDate()) { callback.onNoAction(); return; }
+
+				boolean victory = mission.getCurrentBossHP() <= 0;
+				if (victory) {
+					// Rewards for all guild members
+					java.util.List<GuildMember> members = guildDao.getGuildMembersByGuildId(guildId);
+					for (GuildMember gm : members) {
+						grantPotionAndClothingSafe(gm.getUserId());
+						grantHalfNextBossCoinsSafe(gm.getUserId());
+						incrementUserStatsCompletedSafe(gm.getUserId());
+					}
+					mission.setStatus(SpecialMission.STATUS_COMPLETED);
+					mission.setSuccessful(true);
+				} else {
+					mission.setStatus(SpecialMission.STATUS_COMPLETED);
+					mission.setSuccessful(false);
+				}
+				specialMissionDao.update(mission);
+				guildDao.updateGuildMissionStatus(guildId, false);
+				callback.onCompleted("Mission finalized");
+			} catch (Exception e) {
+				callback.onError("Failed to finalize mission: " + e.getMessage());
+			}
+		});
+	}
+
+	private void grantPotionAndClothingSafe(String userId) {
+        try {
+            com.habitrpg.taskmanager.data.database.entities.Equipment potion = new com.habitrpg.taskmanager.data.database.entities.Equipment();
+            potion.setEquipmentId(java.util.UUID.randomUUID().toString());
+            potion.setUserId(userId);
+            potion.setEquipmentType("potion");
+            potion.setEquipmentName("Mission Potion");
+            potion.setEquipmentDescription("Special mission reward");
+            potion.setPrice(0);
+            potion.setIconResource("ic_potion");
+            potion.setBonusType("strength");
+            potion.setBonusValue(5.0);
+            potion.setBonusDuration("single_use");
+            potion.setActive(false);
+            potion.setDurability(1);
+            equipmentDao.insertEquipment(potion);
+
+            com.habitrpg.taskmanager.data.database.entities.Equipment clothing = new com.habitrpg.taskmanager.data.database.entities.Equipment();
+            clothing.setEquipmentId(java.util.UUID.randomUUID().toString());
+            clothing.setUserId(userId);
+            clothing.setEquipmentType("clothing");
+            clothing.setEquipmentName("Mission Garment");
+            clothing.setEquipmentDescription("Special mission reward");
+            clothing.setPrice(0);
+            clothing.setIconResource("ic_clothing");
+            clothing.setBonusType("strength");
+            clothing.setBonusValue(5.0);
+            clothing.setBonusDuration("permanent");
+            clothing.setActive(false);
+            clothing.setDurability(-1);
+            equipmentDao.insertEquipment(clothing);
+        } catch (Exception ignored) {}
+    }
+
+    private void grantHalfNextBossCoinsSafe(String userId) {
+        try {
+            com.habitrpg.taskmanager.data.database.entities.User user = userDao.getUserById(userId);
+            if (user == null) return;
+            int currentLevel = user.getLevel();
+            int nextLevel = Math.max(1, currentLevel + 1);
+            int baseCoinReward = (int) (200 * Math.pow(1.20, nextLevel - 1));
+            int half = (int) Math.round(baseCoinReward * 0.50);
+            user.setCoins(user.getCoins() + half);
+            userDao.updateUser(user);
+        } catch (Exception ignored) {}
+    }
+
+    private void incrementUserStatsCompletedSafe(String userId) {
+        try {
+            com.habitrpg.taskmanager.data.database.entities.UserStatistics us = userStatisticsDao.getUserStatisticsByUserId(userId);
+            if (us == null) {
+                us = new com.habitrpg.taskmanager.data.database.entities.UserStatistics(userId);
+            }
+            us.setTotalSpecialMissionsCompleted(us.getTotalSpecialMissionsCompleted() + 1);
+            userStatisticsDao.insertUserStatistics(us);
+        } catch (Exception ignored) {}
+    }
 }
 
 

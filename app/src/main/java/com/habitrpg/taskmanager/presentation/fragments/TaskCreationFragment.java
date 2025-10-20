@@ -60,6 +60,13 @@ public class TaskCreationFragment extends Fragment {
             editTaskId = getArguments().getInt("taskId", -1);
         }
 
+        // Update button text based on mode
+        if (isEditMode) {
+            binding.btnCreateTask.setText("Edit Task");
+        } else {
+            binding.btnCreateTask.setText("Create Task");
+        }
+
         setupToolbar();
         setupSpinners();
         setupClickListeners();

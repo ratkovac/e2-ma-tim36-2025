@@ -149,6 +149,19 @@ public class TaskRepository {
         });
     }
 
+    public void getCompletedTaskCountByDifficultyAndImportanceForDate(String userId, String difficulty, String importance, String date, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                int count = database.taskDao().getCompletedTaskCountByDifficultyAndImportanceForDate(userId, difficulty, importance, date);
+                callback.onTaskCountRetrieved(count);
+            } catch (Exception e) {
+                callback.onError("Failed to get completed daily quota count: " + e.getMessage());
+            }
+        });
+    }
+
     public void getExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd, TaskCallback callback) {
         ensureExecutorActive();
         
@@ -162,6 +175,19 @@ public class TaskRepository {
         });
     }
 
+    public void getCompletedExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                int count = database.taskDao().getCompletedExtremeTaskCountForWeek(userId, weekStart, weekEnd);
+                callback.onTaskCountRetrieved(count);
+            } catch (Exception e) {
+                callback.onError("Failed to get completed weekly extreme count: " + e.getMessage());
+            }
+        });
+    }
+
     public void getSpecialTaskCountForMonth(String userId, String monthStart, String monthEnd, TaskCallback callback) {
         ensureExecutorActive();
         
@@ -171,6 +197,19 @@ public class TaskRepository {
                 callback.onTaskCountRetrieved(count);
             } catch (Exception e) {
                 callback.onError("Failed to get monthly special count: " + e.getMessage());
+            }
+        });
+    }
+
+    public void getCompletedSpecialTaskCountForMonth(String userId, String monthStart, String monthEnd, TaskCallback callback) {
+        ensureExecutorActive();
+        
+        executor.execute(() -> {
+            try {
+                int count = database.taskDao().getCompletedSpecialTaskCountForMonth(userId, monthStart, monthEnd);
+                callback.onTaskCountRetrieved(count);
+            } catch (Exception e) {
+                callback.onError("Failed to get completed monthly special count: " + e.getMessage());
             }
         });
     }

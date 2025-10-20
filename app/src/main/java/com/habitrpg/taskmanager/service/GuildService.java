@@ -367,6 +367,14 @@ public class GuildService {
         guildRepository.getCurrentGuild(currentUserId, new GuildRepository.GuildCallback() {
             @Override
             public void onSuccess(String message, Guild guild) {
+                // Attempt to finalize expired mission for this guild (non-blocking)
+                if (guild != null) {
+                    specialMissionRepository.finalizeIfExpiredForGuild(guild.getGuildId(), new SpecialMissionRepository.FinalizeCallback() {
+                        @Override public void onCompleted(String msg) { /* no-op */ }
+                        @Override public void onNoAction() { /* no-op */ }
+                        @Override public void onError(String error) { /* no-op */ }
+                    });
+                }
                 callback.onSuccess(message, guild);
             }
             

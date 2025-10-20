@@ -383,6 +383,10 @@ public class BossFightFragment extends Fragment {
                             if (item.isActive()) {
                                 hasActiveEquipment = true;
                                 
+                                // Debug log
+                                System.out.println("DEBUG: Adding equipment icon for: " + item.getEquipmentName() + 
+                                                 ", iconResource: " + item.getIconResource());
+                                
                                 ImageView equipmentIcon = new ImageView(requireContext());
                                 equipmentIcon.setLayoutParams(new LinearLayout.LayoutParams(
                                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -400,7 +404,11 @@ public class BossFightFragment extends Fragment {
                                 equipmentIcon.setLayoutParams(params);
                                 
                                 // Set the icon resource
-                                int iconResource = getIconResource(item.getIconResource());
+                                String iconResourceName = item.getIconResource();
+                                if (iconResourceName == null || iconResourceName.isEmpty()) {
+                                    iconResourceName = "ic_potion1"; // Default icon
+                                }
+                                int iconResource = getIconResource(iconResourceName);
                                 equipmentIcon.setImageResource(iconResource);
                                 equipmentIcon.setScaleType(ImageView.ScaleType.CENTER_CROP);
                                 equipmentIcon.setContentDescription(item.getEquipmentName());
@@ -433,6 +441,10 @@ public class BossFightFragment extends Fragment {
      * Convert iconResource string to drawable resource ID
      */
     private int getIconResource(String iconResourceName) {
+        if (iconResourceName == null || iconResourceName.isEmpty()) {
+            return R.drawable.ic_potion1; // Default icon
+        }
+        
         switch (iconResourceName) {
             case "ic_potion1":
                 return R.drawable.ic_potion1;
