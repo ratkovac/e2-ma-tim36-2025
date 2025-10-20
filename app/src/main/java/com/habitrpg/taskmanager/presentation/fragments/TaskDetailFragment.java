@@ -343,12 +343,16 @@ public class TaskDetailFragment extends Fragment {
         binding.btnMarkActive.setEnabled(canActivate);
         binding.btnMarkActive.setAlpha(canActivate ? 1.0f : 0.5f);
         
-        // Edit i Delete dugmad - ne mogu se menjati neurađeni, otkazani i završeni zadaci
-        boolean canModify = !isCompleted && !isIncomplete && !isCancelled;
-        binding.btnEditTask.setEnabled(canModify);
-        binding.btnDeleteTask.setEnabled(canModify);
-        binding.btnEditTask.setAlpha(canModify ? 1.0f : 0.5f);
-        binding.btnDeleteTask.setAlpha(canModify ? 1.0f : 0.5f);
+        // Edit dugme - ne može se menjati ako je vremenski završen ili je završen/neurađen/otkazan
+        boolean isTimeExpired = isTaskTimeExpired();
+        boolean canEdit = !isCompleted && !isIncomplete && !isCancelled && !isTimeExpired;
+        binding.btnEditTask.setEnabled(canEdit);
+        binding.btnEditTask.setAlpha(canEdit ? 1.0f : 0.5f);
+        
+        // Delete dugme - ne mogu se menjati neurađeni, otkazani i završeni zadaci (bez vremenske provere)
+        boolean canDelete = !isCompleted && !isIncomplete && !isCancelled;
+        binding.btnDeleteTask.setEnabled(canDelete);
+        binding.btnDeleteTask.setAlpha(canDelete ? 1.0f : 0.5f);
         
         // Dodaj tooltip tekst za objašnjenje zašto su dugmad onemogućena
         if (!canPause && isActive) {
@@ -361,6 +365,32 @@ public class TaskDetailFragment extends Fragment {
             binding.btnMarkActive.setText("► Aktivno\n(Samo ponavljajući)");
         } else {
             binding.btnMarkActive.setText("► Aktivno");
+        }
+        
+        // Dodaj tekst za edit dugme kada je onemogućeno zbog vremenske provere
+        if (!canEdit && isTimeExpired) {
+            binding.btnEditTask.setText("✏️ Izmeni\n(Vremenski završen)");
+        } else {
+            binding.btnEditTask.setText("✏️ Izmeni");
+        }
+    }
+    
+    private boolean isTaskTimeExpired() {
+        if (currentTask == null || currentTask.getStartDate() == null || currentTask.getStartDate().isEmpty()) {
+            return false; // Ako nema datum, smatra se da nije vremenski završen
+        }
+        
+        try {
+            // Parsiraj start_date (format: "yyyy-MM-dd HH:mm")
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+            java.util.Date taskDateTime = sdf.parse(currentTask.getStartDate());
+            java.util.Date currentDateTime = sdf.parse(com.habitrpg.taskmanager.util.DateUtils.getCurrentDateTimeString());
+            
+            // Zadatak je vremenski završen ako je njegov start_date prošao
+            return taskDateTime.before(currentDateTime);
+        } catch (Exception e) {
+            // Ako ne može da parsira datum, smatra se da nije vremenski završen
+            return false;
         }
     }
     

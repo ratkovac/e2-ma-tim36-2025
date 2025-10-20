@@ -99,7 +99,7 @@ public class CalendarFragment extends Fragment {
     }
     
     private void loadAllTasks() {
-        taskService.getAllTasks(new TaskService.TaskCallback() {
+        taskService.getAllTasksIncludingIncomplete(new TaskService.TaskCallback() {
             @Override
             public void onSuccess(String message) {}
             
@@ -121,6 +121,7 @@ public class CalendarFragment extends Fragment {
                         
                         if (tasks != null) {
                             allTasks.clear();
+                            // U kalendaru prikazujemo SVE zadatke (uključujući i prošle "incomplete" zadatke)
                             allTasks.addAll(tasks);
                             filterTasksForDate();
                         }

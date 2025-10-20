@@ -119,6 +119,19 @@ public class TaskRepository {
         });
     }
 
+    public void getAllTasksByUserId(String userId, TaskCallback callback) {
+        ensureExecutorActive();
+
+        executor.execute(() -> {
+            try {
+                List<Task> tasks = database.taskDao().getTasksByUserId(userId);
+                callback.onTasksRetrieved(tasks);
+            } catch (Exception e) {
+                callback.onError("Failed to get tasks by user: " + e.getMessage());
+            }
+        });
+    }
+
     public void getAllTasks(String userId, TaskCallback callback) {
         getTasksByUserId(userId, callback);
     }

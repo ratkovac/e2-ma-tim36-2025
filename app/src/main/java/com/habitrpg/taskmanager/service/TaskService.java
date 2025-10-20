@@ -817,6 +817,35 @@ public class TaskService {
             public void onTaskCountRetrieved(int count) {}
         });
     }
+
+    public void getAllTasksIncludingIncomplete(TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+
+        taskRepository.getAllTasksByUserId(userId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+
+            @Override
+            public void onTaskRetrieved(Task task) {}
+
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {
+                callback.onTasksRetrieved(tasks);
+            }
+
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
     
     public void getTaskCountByDifficultyAndImportanceForDate(String userId, String difficulty, String importance, String date, TaskCountCallback callback) {
         taskRepository.getCompletedTaskCountByDifficultyAndImportanceForDate(userId, difficulty, importance, date, new TaskRepository.TaskCallback() {
