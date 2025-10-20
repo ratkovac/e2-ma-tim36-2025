@@ -23,6 +23,7 @@ public class BossService {
     private final AppDatabase database;
     private final UserRepository userRepository;
     private final UserPreferences userPreferences;
+    private final com.habitrpg.taskmanager.data.repository.SpecialMissionRepository specialMissionRepository;
     
     // Boss fight constants
     private static final int FIRST_BOSS_HP = 200;
@@ -38,6 +39,7 @@ public class BossService {
         database = AppDatabase.getDatabase(context);
         userRepository = UserRepository.getInstance(context);
         userPreferences = UserPreferences.getInstance(context);
+        specialMissionRepository = com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.getInstance(context);
     }
     
     public static synchronized BossService getInstance(Context context) {
@@ -461,6 +463,19 @@ public class BossService {
                     if (attackHits) {
                         boss.takeDamage(playerPp);
                         database.bossDao().updateBoss(boss);
+
+                        // Inform special mission progress about a successful regular boss hit
+                        String currentUserId = userPreferences.getCurrentUserId();
+                        if (currentUserId != null) {
+                            specialMissionRepository.recordRegularBossHit(currentUserId, new com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.ProgressUpdateCallback() {
+                                @Override
+                                public void onUpdated(String message) { /* no-op */ }
+                                @Override
+                                public void onNoActiveMission() { /* no-op */ }
+                                @Override
+                                public void onError(String error) { /* no-op */ }
+                            });
+                        }
                         
                         if (boss.isDefeated()) {
                             // Boss defeated - calculate rewards

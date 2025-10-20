@@ -6,6 +6,7 @@ import com.habitrpg.taskmanager.data.database.AppDatabase;
 import com.habitrpg.taskmanager.data.database.dao.GuildDao;
 import com.habitrpg.taskmanager.data.database.dao.SpecialMissionDao;
 import com.habitrpg.taskmanager.data.database.dao.SpecialMissionProgressDao;
+import com.habitrpg.taskmanager.data.database.dao.TaskDao;
 import com.habitrpg.taskmanager.data.database.entities.Guild;
 import com.habitrpg.taskmanager.data.database.entities.GuildMember;
 import com.habitrpg.taskmanager.data.database.entities.SpecialMission;
@@ -33,6 +34,7 @@ public class SpecialMissionRepository {
 	private final GuildDao guildDao;
 	private final SpecialMissionDao specialMissionDao;
 	private final SpecialMissionProgressDao progressDao;
+	private final TaskDao taskDao;
 	private ExecutorService executor;
 
 	private SpecialMissionRepository(Context context) {
@@ -40,6 +42,7 @@ public class SpecialMissionRepository {
 		this.guildDao = db.guildDao();
 		this.specialMissionDao = db.specialMissionDao();
 		this.progressDao = db.specialMissionProgressDao();
+		this.taskDao = db.taskDao();
 		this.executor = Executors.newSingleThreadExecutor();
 	}
 
@@ -156,6 +159,210 @@ public class SpecialMissionRepository {
 				callback.onUpdated("Special mission progress updated: -2 HP");
 			} catch (Exception e) {
 				callback.onError("Failed to update mission progress: " + e.getMessage());
+			}
+		});
+	}
+
+	public void recordRegularBossHit(String userId, ProgressUpdateCallback callback) {
+		ensureExecutorActive();
+		executor.execute(() -> {
+			try {
+				GuildMember member = guildDao.getGuildMemberByUserId(userId);
+				if (member == null) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				SpecialMission mission = specialMissionDao.getActiveMissionByGuild(member.getGuildId());
+				if (mission == null) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				long now = System.currentTimeMillis();
+				if (now > mission.getEndDate()) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				SpecialMissionProgress progress = progressDao.getByMissionAndUser(mission.getId(), userId);
+				if (progress == null) {
+					progress = new SpecialMissionProgress();
+					progress.setSpecialMissionId(mission.getId());
+					progress.setUserId(userId);
+				}
+
+				if (progress.getRegularBossHits() >= 10) {
+					callback.onUpdated("Regular boss hit cap reached for mission");
+					return;
+				}
+
+				int damage = 2;
+				int newHp = Math.max(0, mission.getCurrentBossHP() - damage);
+				mission.setCurrentBossHP(newHp);
+				if (newHp == 0) {
+					mission.setStatus(SpecialMission.STATUS_COMPLETED);
+					mission.setSuccessful(true);
+					guildDao.updateGuildMissionStatus(member.getGuildId(), false);
+				}
+				specialMissionDao.update(mission);
+
+				progress.setRegularBossHits(progress.getRegularBossHits() + 1);
+				progress.setTotalDamageDealt(progress.getTotalDamageDealt() + damage);
+				progressDao.insert(progress);
+
+				callback.onUpdated("Special mission progress updated: regular hit -2 HP");
+			} catch (Exception e) {
+				callback.onError("Failed to update mission progress: " + e.getMessage());
+			}
+		});
+	}
+
+	public void recordTaskCompletion(String userId, String difficulty, String importance, ProgressUpdateCallback callback) {
+		ensureExecutorActive();
+		executor.execute(() -> {
+			try {
+				GuildMember member = guildDao.getGuildMemberByUserId(userId);
+				if (member == null) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				SpecialMission mission = specialMissionDao.getActiveMissionByGuild(member.getGuildId());
+				if (mission == null) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				long now = System.currentTimeMillis();
+				if (now > mission.getEndDate()) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				boolean isInEasySet =
+					("very_easy".equals(difficulty)) ||
+					("easy".equals(difficulty)) ||
+					("normal".equals(importance)) ||
+					("important".equals(importance));
+
+				int totalDamage;
+				SpecialMissionProgress progress = progressDao.getByMissionAndUser(mission.getId(), userId);
+				if (progress == null) {
+					progress = new SpecialMissionProgress();
+					progress.setSpecialMissionId(mission.getId());
+					progress.setUserId(userId);
+				}
+
+				if (isInEasySet) {
+					int multiplier = ("easy".equals(difficulty) || "normal".equals(importance)) ? 2 : 1;
+					int count = multiplier;
+					if (progress.getEasyTasksCompleted() + count > 10) {
+						callback.onUpdated("Easy tasks cap reached for mission");
+						return;
+					}
+					totalDamage = 1 * multiplier;
+					progress.setEasyTasksCompleted(progress.getEasyTasksCompleted() + count);
+				} else {
+					if (progress.getOtherTasksCompleted() >= 6) {
+						callback.onUpdated("Other tasks cap reached for mission");
+						return;
+					}
+					totalDamage = 4;
+					progress.setOtherTasksCompleted(progress.getOtherTasksCompleted() + 1);
+				}
+
+				int newHp = Math.max(0, mission.getCurrentBossHP() - totalDamage);
+				mission.setCurrentBossHP(newHp);
+				if (newHp == 0) {
+					mission.setStatus(SpecialMission.STATUS_COMPLETED);
+					mission.setSuccessful(true);
+					guildDao.updateGuildMissionStatus(member.getGuildId(), false);
+				}
+				specialMissionDao.update(mission);
+
+				progress.setTotalDamageDealt(progress.getTotalDamageDealt() + totalDamage);
+				progressDao.insert(progress);
+
+				callback.onUpdated("Special mission progress updated by task completion");
+			} catch (Exception e) {
+				callback.onError("Failed to update mission progress: " + e.getMessage());
+			}
+		});
+	}
+
+	public void checkAndApplyNoUnresolvedTasksBonus(String userId, ProgressUpdateCallback callback) {
+		ensureExecutorActive();
+		executor.execute(() -> {
+			try {
+				GuildMember member = guildDao.getGuildMemberByUserId(userId);
+				if (member == null) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				SpecialMission mission = specialMissionDao.getActiveMissionByGuild(member.getGuildId());
+				if (mission == null) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				long now = System.currentTimeMillis();
+				if (now > mission.getEndDate()) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				SpecialMissionProgress progress = progressDao.getByMissionAndUser(mission.getId(), userId);
+				if (progress == null) {
+					progress = new SpecialMissionProgress();
+					progress.setSpecialMissionId(mission.getId());
+					progress.setUserId(userId);
+				}
+
+				if (progress.isHasNoUnresolvedTasks()) {
+					callback.onUpdated("No-unresolved bonus already applied");
+					return;
+				}
+
+				// Determine if user has unresolved tasks during mission window
+				java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+				String missionStartDate = sdf.format(new java.util.Date(mission.getStartDate()));
+				String missionEndDate = sdf.format(new java.util.Date(mission.getEndDate()));
+				java.util.List<com.habitrpg.taskmanager.data.database.entities.Task> tasks = taskDao.getTasksInDateRange(userId, missionStartDate, missionEndDate);
+
+				boolean hasUnresolved = false;
+				for (com.habitrpg.taskmanager.data.database.entities.Task t : tasks) {
+					String status = t.getStatus();
+					if (!"completed".equals(status) && !"cancelled".equals(status)) {
+						hasUnresolved = true;
+						break;
+					}
+				}
+
+				if (hasUnresolved) {
+					callback.onUpdated("User has unresolved tasks - no bonus");
+					return;
+				}
+
+				// Apply -10 HP once per mission per user
+				int damage = 10;
+				int newHp = Math.max(0, mission.getCurrentBossHP() - damage);
+				mission.setCurrentBossHP(newHp);
+				if (newHp == 0) {
+					mission.setStatus(SpecialMission.STATUS_COMPLETED);
+					mission.setSuccessful(true);
+					guildDao.updateGuildMissionStatus(member.getGuildId(), false);
+				}
+				specialMissionDao.update(mission);
+
+				progress.setHasNoUnresolvedTasks(true);
+				progress.setTotalDamageDealt(progress.getTotalDamageDealt() + damage);
+				progressDao.insert(progress);
+
+				callback.onUpdated("Special mission updated: no-unresolved-tasks bonus -10 HP");
+			} catch (Exception e) {
+				callback.onError("Failed to apply no-unresolved-tasks bonus: " + e.getMessage());
 			}
 		});
 	}

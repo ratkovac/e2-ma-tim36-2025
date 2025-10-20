@@ -20,11 +20,13 @@ public class TaskService {
     private TaskRepository taskRepository;
     private UserRepository userRepository;
     private UserPreferences userPreferences;
+    private final com.habitrpg.taskmanager.data.repository.SpecialMissionRepository specialMissionRepository;
 
     private TaskService(Context context) {
         taskRepository = TaskRepository.getInstance(context);
         userRepository = UserRepository.getInstance(context);
         userPreferences = UserPreferences.getInstance(context);
+        this.specialMissionRepository = com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.getInstance(context);
     }
     
     public static synchronized TaskService getInstance(Context context) {
@@ -248,7 +250,27 @@ public class TaskService {
                         taskRepository.insertTaskCompletion(completion, new TaskRepository.TaskCallback() {
                             @Override
                             public void onSuccess(String message) {
+                                // Update special mission progress for task completion (non-blocking)
+                                String difficulty = task.getDifficulty();
+                                String importance = task.getImportance();
+                                specialMissionRepository.recordTaskCompletion(userId, difficulty, importance,
+                                    new com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.ProgressUpdateCallback() {
+                                        @Override public void onUpdated(String msg) { /* no-op */ }
+                                        @Override public void onNoActiveMission() { /* no-op */ }
+                                        @Override public void onError(String error) { /* no-op */ }
+                                    }
+                                );
+                                
                                 updateUserXP(task, callback);
+
+                                // Periodically check and apply no-unresolved-tasks bonus
+                                specialMissionRepository.checkAndApplyNoUnresolvedTasksBonus(userId,
+                                    new com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.ProgressUpdateCallback() {
+                                        @Override public void onUpdated(String msg) { /* no-op */ }
+                                        @Override public void onNoActiveMission() { /* no-op */ }
+                                        @Override public void onError(String error) { /* no-op */ }
+                                    }
+                                );
                             }
                             
                             @Override
