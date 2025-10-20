@@ -20,6 +20,7 @@ import com.habitrpg.taskmanager.presentation.adapters.GuildChatAdapter;
 import com.habitrpg.taskmanager.service.AuthService;
 import com.habitrpg.taskmanager.service.GuildService;
 import com.habitrpg.taskmanager.service.UserPreferences;
+import com.habitrpg.taskmanager.service.GuildChatListenerService;
 import com.habitrpg.taskmanager.data.repository.UserRepository;
 
 import java.text.SimpleDateFormat;
@@ -131,7 +132,7 @@ public class GuildChatFragment extends Fragment {
             public void onError(String error) {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        Toast.makeText(requireContext(), "You are not in any guild", Toast.LENGTH_SHORT).show();
+                        // Removed noisy toast
                         requireActivity().onBackPressed();
                     });
                 }
@@ -147,6 +148,19 @@ public class GuildChatFragment extends Fragment {
     }
     
     private void loadMessages() {
+        if (currentGuild == null) return;
+        
+        GuildChatListenerService.startListening(requireContext(), currentGuild.getGuildId(), 
+            () -> {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(this::refreshMessages);
+                }
+            });
+        
+        refreshMessages();
+    }
+    
+    private void refreshMessages() {
         if (currentGuild == null) return;
         
         guildService.getGuildMessages(currentGuild.getGuildId(), new GuildService.GuildMessageCallback() {
@@ -222,6 +236,7 @@ public class GuildChatFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        GuildChatListenerService.stopListening();
         binding = null;
     }
 }

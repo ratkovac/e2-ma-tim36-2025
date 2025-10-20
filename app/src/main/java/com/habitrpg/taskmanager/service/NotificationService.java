@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat;
 
 import com.habitrpg.taskmanager.R;
 import com.habitrpg.taskmanager.data.database.entities.GuildInvite;
+import com.habitrpg.taskmanager.data.database.entities.FriendRequest;
 import com.habitrpg.taskmanager.presentation.activities.MainActivity;
 
 import java.util.List;
@@ -23,6 +24,14 @@ public class NotificationService {
     private static final String GUILD_INVITE_CHANNEL_ID = "guild_invites";
     private static final String GUILD_INVITE_CHANNEL_NAME = "Guild Invites";
     private static final String GUILD_INVITE_CHANNEL_DESCRIPTION = "Notifications for guild invitations";
+    
+    private static final String FRIEND_REQUEST_CHANNEL_ID = "friend_requests";
+    private static final String FRIEND_REQUEST_CHANNEL_NAME = "Friend Requests";
+    private static final String FRIEND_REQUEST_CHANNEL_DESCRIPTION = "Notifications for friend requests";
+    
+    private static final String GUILD_MESSAGE_CHANNEL_ID = "guild_messages";
+    private static final String GUILD_MESSAGE_CHANNEL_NAME = "Guild Messages";
+    private static final String GUILD_MESSAGE_CHANNEL_DESCRIPTION = "Notifications for new guild chat messages";
     
     private static NotificationService instance;
     private final Context context;
@@ -43,18 +52,37 @@ public class NotificationService {
     
     private void createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                GUILD_INVITE_CHANNEL_ID,
-                GUILD_INVITE_CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
-            );
-            channel.setDescription(GUILD_INVITE_CHANNEL_DESCRIPTION);
-            channel.enableVibration(true);
-            channel.setShowBadge(true);
-            
             NotificationManager manager = context.getSystemService(NotificationManager.class);
             if (manager != null) {
-                manager.createNotificationChannel(channel);
+                NotificationChannel guildChannel = new NotificationChannel(
+                    GUILD_INVITE_CHANNEL_ID,
+                    GUILD_INVITE_CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_HIGH
+                );
+                guildChannel.setDescription(GUILD_INVITE_CHANNEL_DESCRIPTION);
+                guildChannel.enableVibration(true);
+                guildChannel.setShowBadge(true);
+                manager.createNotificationChannel(guildChannel);
+                
+                NotificationChannel friendChannel = new NotificationChannel(
+                    FRIEND_REQUEST_CHANNEL_ID,
+                    FRIEND_REQUEST_CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_HIGH
+                );
+                friendChannel.setDescription(FRIEND_REQUEST_CHANNEL_DESCRIPTION);
+                friendChannel.enableVibration(true);
+                friendChannel.setShowBadge(true);
+                manager.createNotificationChannel(friendChannel);
+                
+                NotificationChannel messageChannel = new NotificationChannel(
+                    GUILD_MESSAGE_CHANNEL_ID,
+                    GUILD_MESSAGE_CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_DEFAULT
+                );
+                messageChannel.setDescription(GUILD_MESSAGE_CHANNEL_DESCRIPTION);
+                messageChannel.enableVibration(true);
+                messageChannel.setShowBadge(true);
+                manager.createNotificationChannel(messageChannel);
             }
         }
     }
@@ -218,6 +246,73 @@ public class NotificationService {
             
         } catch (Exception e) {
             Log.e(TAG, "Error showing multiple guild invites notification", e);
+        }
+    }
+    
+    public void showFriendRequestNotification(FriendRequest request) {
+        try {
+            Intent mainIntent = new Intent(context, MainActivity.class);
+            mainIntent.putExtra("action", "open_friend_requests");
+            mainIntent.putExtra("request_id", request.getId());
+            mainIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            
+            PendingIntent mainPendingIntent = PendingIntent.getActivity(
+                context, 
+                request.getId().hashCode(), 
+                mainIntent, 
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+            
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(context, FRIEND_REQUEST_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle("Friend Request")
+                .setContentText(request.getFromUsername() + " wants to be your friend")
+                .setStyle(new NotificationCompat.BigTextStyle()
+                    .bigText(request.getFromUsername() + " sent you a friend request. Tap to view and respond."))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_SOCIAL)
+                .setAutoCancel(true)
+                .setContentIntent(mainPendingIntent);
+            
+            notificationManager.notify(request.getId().hashCode(), builder.build());
+            
+            Log.d(TAG, "Friend request notification shown for: " + request.getFromUsername());
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error showing friend request notification", e);
+        }
+    }
+
+    public void showGuildMessageNotification(String guildId, String guildName, String username, String messageText) {
+        try {
+            Intent intent = new Intent(context, MainActivity.class);
+            intent.putExtra("action", "open_guild_chat");
+            intent.putExtra("guild_id", guildId);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            
+            PendingIntent pendingIntent = PendingIntent.getActivity(
+                context,
+                (int) (System.currentTimeMillis() % Integer.MAX_VALUE),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+            
+            String title = guildName != null && !guildName.isEmpty() ? guildName : "Guild Chat";
+            String content = username + ": " + messageText;
+            
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(context, GUILD_MESSAGE_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(content))
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent);
+            
+            notificationManager.notify((int) (System.currentTimeMillis() % Integer.MAX_VALUE), builder.build());
+        } catch (Exception e) {
+            Log.e(TAG, "Error showing guild message notification", e);
         }
     }
 }

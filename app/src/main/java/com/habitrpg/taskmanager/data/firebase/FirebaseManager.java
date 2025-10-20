@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreSettings;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.habitrpg.taskmanager.data.database.entities.User;
 import com.habitrpg.taskmanager.data.database.entities.Category;
 
@@ -197,6 +198,455 @@ public class FirebaseManager {
     
     public interface UserListener {
         void onUserRetrieved(User user);
+        void onError(String error);
+    }
+    
+    public void createGuildDocument(String guildId, String guildName, String description, 
+                                   String leaderId, String leaderUsername, int maxMembers, 
+                                   OnCompleteListener listener) {
+        Map<String, Object> guildData = new HashMap<>();
+        guildData.put("guildId", guildId);
+        guildData.put("guildName", guildName);
+        guildData.put("description", description);
+        guildData.put("leaderId", leaderId);
+        guildData.put("leaderUsername", leaderUsername);
+        guildData.put("maxMembers", maxMembers);
+        guildData.put("memberCount", 1);
+        guildData.put("isActive", true);
+        guildData.put("missionStarted", false);
+        guildData.put("createdAt", System.currentTimeMillis());
+        
+        db.collection("guilds")
+            .document(guildId)
+            .set(guildData)
+            .addOnCompleteListener(task -> {
+                if (listener != null) {
+                    listener.onComplete(task.isSuccessful(), task.getException());
+                }
+            });
+    }
+    
+    public void getGuildDocument(String guildId, GuildListener listener) {
+        db.collection("guilds")
+            .document(guildId)
+            .get()
+            .addOnSuccessListener(documentSnapshot -> {
+                if (documentSnapshot.exists()) {
+                    Map<String, Object> data = documentSnapshot.getData();
+                    if (data != null && listener != null) {
+                        listener.onGuildRetrieved(data);
+                    } else if (listener != null) {
+                        listener.onError("Guild data is null");
+                    }
+                } else if (listener != null) {
+                    listener.onError("Guild not found in Firebase");
+                }
+            })
+            .addOnFailureListener(e -> {
+                if (listener != null) {
+                    listener.onError("Failed to get guild: " + e.getMessage());
+                }
+            });
+    }
+    
+    public interface GuildListener {
+        void onGuildRetrieved(Map<String, Object> guildData);
+        void onError(String error);
+    }
+    
+    public void addGuildMemberDocument(String memberId, String guildId, String userId, 
+                                      String username, String email, int avatarId, 
+                                      boolean isLeader, OnCompleteListener listener) {
+        Map<String, Object> memberData = new HashMap<>();
+        memberData.put("memberId", memberId);
+        memberData.put("guildId", guildId);
+        memberData.put("userId", userId);
+        memberData.put("username", username);
+        memberData.put("email", email);
+        memberData.put("avatarId", avatarId);
+        memberData.put("isLeader", isLeader);
+        memberData.put("isActive", true);
+        memberData.put("joinedAt", System.currentTimeMillis());
+        
+        db.collection("guild_members")
+            .document(memberId)
+            .set(memberData)
+            .addOnCompleteListener(task -> {
+                if (listener != null) {
+                    listener.onComplete(task.isSuccessful(), task.getException());
+                }
+            });
+    }
+    
+    public ListenerRegistration listenForGuildMembers(String guildId, GuildMembersListener listener) {
+        return db.collection("guild_members")
+            .whereEqualTo("guildId", guildId)
+            .addSnapshotListener((snapshots, error) -> {
+                if (error != null) {
+                    listener.onError("Failed to listen for members: " + error.getMessage());
+                    return;
+                }
+                
+                if (snapshots != null && !snapshots.isEmpty()) {
+                    for (com.google.firebase.firestore.DocumentChange dc : snapshots.getDocumentChanges()) {
+                        if (dc.getDocument().getMetadata().hasPendingWrites()) {
+                            continue;
+                        }
+                        
+                        Map<String, Object> data = dc.getDocument().getData();
+                        String memberId = (String) data.get("memberId");
+                        boolean isActive = data.get("isActive") != null ? (Boolean) data.get("isActive") : true;
+                        
+                        switch (dc.getType()) {
+                            case ADDED:
+                                if (isActive) {
+                                    listener.onMemberAdded(
+                                        memberId,
+                                        (String) data.get("guildId"),
+                                        (String) data.get("userId"),
+                                        (String) data.get("username"),
+                                        (String) data.get("email"),
+                                        ((Number) data.get("avatarId")).intValue(),
+                                        (Boolean) data.get("isLeader")
+                                    );
+                                }
+                                break;
+                            case MODIFIED:
+                                if (!isActive) {
+                                    listener.onMemberRemoved(memberId);
+                                }
+                                break;
+                            case REMOVED:
+                                listener.onMemberRemoved(memberId);
+                                break;
+                        }
+                    }
+                }
+            });
+    }
+    
+    public interface GuildMembersListener {
+        void onMemberAdded(String memberId, String guildId, String userId, 
+                          String username, String email, int avatarId, boolean isLeader);
+        void onMemberRemoved(String memberId);
+        void onError(String error);
+    }
+    
+    public void removeGuildMemberDocument(String memberId, OnCompleteListener listener) {
+        db.collection("guild_members")
+            .document(memberId)
+            .update("isActive", false)
+            .addOnCompleteListener(task -> {
+                if (listener != null) {
+                    listener.onComplete(task.isSuccessful(), task.getException());
+                }
+            });
+    }
+    
+    public void disbandGuildDocument(String guildId, OnCompleteListener listener) {
+        // Deactivate guild
+        db.collection("guilds")
+            .document(guildId)
+            .update("isActive", false)
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    // Deactivate all members
+                    db.collection("guild_members")
+                        .whereEqualTo("guildId", guildId)
+                        .get()
+                        .addOnSuccessListener(querySnapshot -> {
+                            for (QueryDocumentSnapshot doc : querySnapshot) {
+                                doc.getReference().update("isActive", false);
+                            }
+                            if (listener != null) {
+                                listener.onComplete(true, null);
+                            }
+                        })
+                        .addOnFailureListener(e -> {
+                            if (listener != null) {
+                                listener.onComplete(false, e);
+                            }
+                        });
+                } else {
+                    if (listener != null) {
+                        listener.onComplete(false, task.getException());
+                    }
+                }
+            });
+    }
+    
+    public void sendGuildMessageDocument(String messageId, String guildId, String userId, 
+                                        String username, String messageText, long timestamp,
+                                        OnCompleteListener listener) {
+        Map<String, Object> messageData = new HashMap<>();
+        messageData.put("messageId", messageId);
+        messageData.put("guildId", guildId);
+        messageData.put("userId", userId);
+        messageData.put("username", username);
+        messageData.put("messageText", messageText);
+        messageData.put("timestamp", timestamp);
+        messageData.put("systemMessage", false);
+        
+        db.collection("guild_messages")
+            .document(messageId)
+            .set(messageData)
+            .addOnCompleteListener(task -> {
+                if (listener != null) {
+                    listener.onComplete(task.isSuccessful(), task.getException());
+                }
+            });
+    }
+    
+    public ListenerRegistration listenForGuildMessages(String guildId, GuildMessagesListener listener) {
+        return db.collection("guild_messages")
+            .whereEqualTo("guildId", guildId)
+            .addSnapshotListener((snapshots, error) -> {
+                if (error != null) {
+                    listener.onError("Failed to listen for messages: " + error.getMessage());
+                    return;
+                }
+                
+                if (snapshots != null) {
+                    java.util.List<QueryDocumentSnapshot> sortedDocs = new java.util.ArrayList<>();
+                    for (QueryDocumentSnapshot doc : snapshots) {
+                        if (!doc.getMetadata().hasPendingWrites()) {
+                            sortedDocs.add(doc);
+                        }
+                    }
+                    
+                    // Sort by timestamp on client side
+                    sortedDocs.sort((doc1, doc2) -> {
+                        Long ts1 = ((Number) doc1.get("timestamp")).longValue();
+                        Long ts2 = ((Number) doc2.get("timestamp")).longValue();
+                        return ts1.compareTo(ts2);
+                    });
+                    
+                    for (QueryDocumentSnapshot doc : sortedDocs) {
+                        Map<String, Object> data = doc.getData();
+                        listener.onMessageReceived(
+                            (String) data.get("messageId"),
+                            (String) data.get("guildId"),
+                            (String) data.get("userId"),
+                            (String) data.get("username"),
+                            (String) data.get("messageText"),
+                            ((Number) data.get("timestamp")).longValue()
+                        );
+                    }
+                }
+            });
+    }
+    
+    public interface GuildMessagesListener {
+        void onMessageReceived(String messageId, String guildId, String userId, 
+                              String username, String messageText, long timestamp);
+        void onError(String error);
+    }
+    
+    public void sendGuildInviteDocument(String inviteId, String guildId, String guildName,
+                                       String fromUserId, String fromUsername,
+                                       String toUserId, String toUsername,
+                                       OnCompleteListener listener) {
+        Map<String, Object> inviteData = new HashMap<>();
+        inviteData.put("inviteId", inviteId);
+        inviteData.put("guildId", guildId);
+        inviteData.put("guildName", guildName);
+        inviteData.put("fromUserId", fromUserId);
+        inviteData.put("fromUsername", fromUsername);
+        inviteData.put("toUserId", toUserId);
+        inviteData.put("toUsername", toUsername);
+        inviteData.put("status", "pending");
+        inviteData.put("createdAt", System.currentTimeMillis());
+        
+        db.collection("guild_invites")
+            .document(inviteId)
+            .set(inviteData)
+            .addOnCompleteListener(task -> {
+                if (listener != null) {
+                    listener.onComplete(task.isSuccessful(), task.getException());
+                }
+            });
+    }
+    
+    public void updateGuildInviteStatus(String inviteId, String status, OnCompleteListener listener) {
+        Map<String, Object> updateData = new HashMap<>();
+        updateData.put("status", status);
+        updateData.put("respondedAt", System.currentTimeMillis());
+        
+        db.collection("guild_invites")
+            .document(inviteId)
+            .update(updateData)
+            .addOnCompleteListener(task -> {
+                if (listener != null) {
+                    listener.onComplete(task.isSuccessful(), task.getException());
+                }
+            });
+    }
+    
+    public void listenForGuildInvites(String userId, GuildInviteListener listener) {
+        db.collection("guild_invites")
+            .whereEqualTo("toUserId", userId)
+            .whereEqualTo("status", "pending")
+            .addSnapshotListener((snapshots, error) -> {
+                if (error != null) {
+                    listener.onError("Failed to listen for invites: " + error.getMessage());
+                    return;
+                }
+                
+                if (snapshots != null) {
+                    for (QueryDocumentSnapshot doc : snapshots) {
+                        Map<String, Object> data = doc.getData();
+                        listener.onInviteReceived(
+                            (String) data.get("inviteId"),
+                            (String) data.get("guildId"),
+                            (String) data.get("guildName"),
+                            (String) data.get("fromUserId"),
+                            (String) data.get("fromUsername"),
+                            (String) data.get("toUserId"),
+                            (String) data.get("toUsername")
+                        );
+                    }
+                }
+            });
+    }
+    
+    public interface GuildInviteListener {
+        void onInviteReceived(String inviteId, String guildId, String guildName,
+                            String fromUserId, String fromUsername,
+                            String toUserId, String toUsername);
+        void onError(String error);
+    }
+    
+    public void sendFriendRequestDocument(String requestId, String fromUserId, String fromUsername,
+                                         String fromEmail, int fromAvatarId,
+                                         String toUserId, String toUsername,
+                                         OnCompleteListener listener) {
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("requestId", requestId);
+        requestData.put("fromUserId", fromUserId);
+        requestData.put("fromUsername", fromUsername);
+        requestData.put("fromEmail", fromEmail);
+        requestData.put("fromAvatarId", fromAvatarId);
+        requestData.put("toUserId", toUserId);
+        requestData.put("toUsername", toUsername);
+        requestData.put("status", "pending");
+        requestData.put("createdAt", System.currentTimeMillis());
+        
+        db.collection("friend_requests")
+            .document(requestId)
+            .set(requestData)
+            .addOnCompleteListener(task -> {
+                if (listener != null) {
+                    listener.onComplete(task.isSuccessful(), task.getException());
+                }
+            });
+    }
+    
+    public void updateFriendRequestStatus(String requestId, String status, OnCompleteListener listener) {
+        Map<String, Object> updateData = new HashMap<>();
+        updateData.put("status", status);
+        updateData.put("respondedAt", System.currentTimeMillis());
+        
+        db.collection("friend_requests")
+            .document(requestId)
+            .update(updateData)
+            .addOnCompleteListener(task -> {
+                if (listener != null) {
+                    listener.onComplete(task.isSuccessful(), task.getException());
+                }
+            });
+    }
+    
+    public void createFriendDocument(String friendshipId, String userId, String friendUserId,
+                                    String friendUsername, String friendEmail, int friendAvatarId,
+                                    OnCompleteListener listener) {
+        Map<String, Object> friendData = new HashMap<>();
+        friendData.put("friendshipId", friendshipId);
+        friendData.put("userId", userId);
+        friendData.put("friendUserId", friendUserId);
+        friendData.put("friendUsername", friendUsername);
+        friendData.put("friendEmail", friendEmail);
+        friendData.put("friendAvatarId", friendAvatarId);
+        friendData.put("status", "accepted");
+        friendData.put("createdAt", System.currentTimeMillis());
+        
+        db.collection("friends")
+            .document(friendshipId)
+            .set(friendData)
+            .addOnCompleteListener(task -> {
+                if (listener != null) {
+                    listener.onComplete(task.isSuccessful(), task.getException());
+                }
+            });
+    }
+    
+    public void removeFriendDocument(String userId, String friendUserId, OnCompleteListener listener) {
+        // Remove friendship from both sides
+        db.collection("friends")
+            .whereEqualTo("userId", userId)
+            .whereEqualTo("friendUserId", friendUserId)
+            .get()
+            .addOnSuccessListener(querySnapshot -> {
+                for (QueryDocumentSnapshot doc : querySnapshot) {
+                    doc.getReference().delete();
+                }
+                
+                // Remove reverse friendship
+                db.collection("friends")
+                    .whereEqualTo("userId", friendUserId)
+                    .whereEqualTo("friendUserId", userId)
+                    .get()
+                    .addOnSuccessListener(reverseSnapshot -> {
+                        for (QueryDocumentSnapshot doc : reverseSnapshot) {
+                            doc.getReference().delete();
+                        }
+                        if (listener != null) {
+                            listener.onComplete(true, null);
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        if (listener != null) {
+                            listener.onComplete(false, e);
+                        }
+                    });
+            })
+            .addOnFailureListener(e -> {
+                if (listener != null) {
+                    listener.onComplete(false, e);
+                }
+            });
+    }
+    
+    public void listenForFriendRequests(String userId, FriendRequestListener listener) {
+        db.collection("friend_requests")
+            .whereEqualTo("toUserId", userId)
+            .whereEqualTo("status", "pending")
+            .addSnapshotListener((snapshots, error) -> {
+                if (error != null) {
+                    listener.onError("Failed to listen for friend requests: " + error.getMessage());
+                    return;
+                }
+                
+                if (snapshots != null) {
+                    for (QueryDocumentSnapshot doc : snapshots) {
+                        Map<String, Object> data = doc.getData();
+                        listener.onRequestReceived(
+                            (String) data.get("requestId"),
+                            (String) data.get("fromUserId"),
+                            (String) data.get("fromUsername"),
+                            (String) data.get("fromEmail"),
+                            ((Number) data.get("fromAvatarId")).intValue(),
+                            (String) data.get("toUserId"),
+                            (String) data.get("toUsername")
+                        );
+                    }
+                }
+            });
+    }
+    
+    public interface FriendRequestListener {
+        void onRequestReceived(String requestId, String fromUserId, String fromUsername,
+                              String fromEmail, int fromAvatarId,
+                              String toUserId, String toUsername);
         void onError(String error);
     }
 }

@@ -20,6 +20,9 @@ public interface FriendDao {
     @Query("SELECT * FROM friends WHERE user_id = :userId AND friend_user_id = :friendUserId")
     Friend getFriendByUserIdAndFriendId(String userId, String friendUserId);
     
+    @Query("SELECT * FROM friends WHERE id = :friendshipId")
+    Friend getFriendById(String friendshipId);
+    
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertFriend(Friend friend);
     

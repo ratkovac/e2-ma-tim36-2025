@@ -117,6 +117,9 @@ public interface GuildDao {
     @Query("SELECT * FROM guild_messages WHERE guild_id = :guildId ORDER BY timestamp ASC")
     List<GuildMessage> getGuildMessages(String guildId);
     
+    @Query("SELECT * FROM guild_messages WHERE message_id = :messageId")
+    GuildMessage getGuildMessageById(String messageId);
+    
     @Query("SELECT * FROM guild_messages WHERE guild_id = :guildId ORDER BY timestamp DESC LIMIT :limit")
     List<GuildMessage> getRecentGuildMessages(String guildId, int limit);
     

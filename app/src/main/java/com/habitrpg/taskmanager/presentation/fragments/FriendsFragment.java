@@ -4,6 +4,8 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -48,6 +50,10 @@ public class FriendsFragment extends Fragment {
     
     private static final int CAMERA_PERMISSION_REQUEST = 100;
     
+    private Handler refreshHandler;
+    private Runnable refreshRunnable;
+    private static final long REFRESH_INTERVAL = 2000;
+    
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -63,7 +69,28 @@ public class FriendsFragment extends Fragment {
         
         setupRecyclerViews();
         setupClickListeners();
+        setupFragmentResultListeners();
+        setupAutoRefresh();
         loadData();
+    }
+    
+    private void setupFragmentResultListeners() {
+        getParentFragmentManager().setFragmentResultListener("friend_request_handled", getViewLifecycleOwner(), (requestKey, bundle) -> {
+            loadData();
+        });
+    }
+    
+    private void setupAutoRefresh() {
+        refreshHandler = new Handler(Looper.getMainLooper());
+        refreshRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (isAdded() && getContext() != null) {
+                    loadData();
+                    refreshHandler.postDelayed(this, REFRESH_INTERVAL);
+                }
+            }
+        };
     }
     
     private void setupRecyclerViews() {
@@ -345,8 +372,28 @@ public class FriendsFragment extends Fragment {
     }
     
     @Override
+    public void onResume() {
+        super.onResume();
+        loadData();
+        if (refreshHandler != null && refreshRunnable != null) {
+            refreshHandler.postDelayed(refreshRunnable, REFRESH_INTERVAL);
+        }
+    }
+    
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (refreshHandler != null && refreshRunnable != null) {
+            refreshHandler.removeCallbacks(refreshRunnable);
+        }
+    }
+    
+    @Override
     public void onDestroyView() {
         super.onDestroyView();
+        if (refreshHandler != null && refreshRunnable != null) {
+            refreshHandler.removeCallbacks(refreshRunnable);
+        }
         if (friendService != null) {
             friendService.shutdown();
         }

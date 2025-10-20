@@ -176,3 +176,5 @@ public class CategoryService {
         void onCategoriesRetrieved(List<Category> categories);
     }
 }
+
+

@@ -84,17 +84,23 @@ public class GuildInviteDialog extends DialogFragment {
             
             @Override
             public void onError(String error) {
-                requireActivity().runOnUiThread(() -> {
-                    Toast.makeText(requireContext(), "Failed to load friends: " + error, Toast.LENGTH_SHORT).show();
-                });
+                if (getActivity() != null && isAdded()) {
+                    getActivity().runOnUiThread(() -> {
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(), "Failed to load friends: " + error, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
             }
             
             @Override
             public void onFriendsRetrieved(List<Friend> friendsList) {
-                requireActivity().runOnUiThread(() -> {
-                    friends = friendsList;
-                    updateUI();
-                });
+                if (getActivity() != null && isAdded()) {
+                    getActivity().runOnUiThread(() -> {
+                        friends = friendsList;
+                        updateUI();
+                    });
+                }
             }
         });
     }

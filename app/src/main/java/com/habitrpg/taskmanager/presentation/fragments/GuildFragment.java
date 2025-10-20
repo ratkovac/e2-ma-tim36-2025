@@ -24,6 +24,7 @@ import com.habitrpg.taskmanager.presentation.adapters.GuildMemberAdapter;
 import com.habitrpg.taskmanager.presentation.dialogs.CreateGuildDialog;
 import com.habitrpg.taskmanager.presentation.dialogs.GuildInviteDialog;
 import com.habitrpg.taskmanager.service.GuildService;
+import com.habitrpg.taskmanager.service.GuildMembersListenerService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -75,7 +76,21 @@ public class GuildFragment extends Fragment {
         initializeViews(view);
         setupRecyclerViews();
         setupClickListeners();
+        setupFragmentResultListeners();
         loadData();
+    }
+    
+    private void setupFragmentResultListeners() {
+        getParentFragmentManager().setFragmentResultListener("guild_created", getViewLifecycleOwner(), (requestKey, bundle) -> {
+            loadData();
+            // In case DB sync finishes slightly after result, refresh again shortly
+            android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+            handler.postDelayed(this::loadData, 400);
+        });
+        
+        getParentFragmentManager().setFragmentResultListener("invite_sent", getViewLifecycleOwner(), (requestKey, bundle) -> {
+            Toast.makeText(requireContext(), "Invite sent successfully!", Toast.LENGTH_SHORT).show();
+        });
     }
     
     private void initializeViews(View view) {
@@ -138,10 +153,7 @@ public class GuildFragment extends Fragment {
                         if (isAdded() && getContext() != null) {
                             currentGuild = null;
                             updateGuildUI();
-                            // Show toast if user is not in any guild
-                            if (error.contains("not in any guild")) {
-                                Toast.makeText(getContext(), "You are not in any guild. Create one or wait for an invitation.", Toast.LENGTH_LONG).show();
-                            }
+                            // Silence toast when user is not in any guild
                         }
                     });
                 }
@@ -152,6 +164,7 @@ public class GuildFragment extends Fragment {
     private void loadGuildMembers() {
         if (currentGuild == null) {
             // Clear members list when no guild
+            GuildMembersListenerService.stopListening();
             if (getActivity() != null) {
                 getActivity().runOnUiThread(() -> {
                     if (isAdded() && getContext() != null) {
@@ -163,6 +176,37 @@ public class GuildFragment extends Fragment {
             }
             return;
         }
+        
+        GuildMembersListenerService.startListening(requireContext(), currentGuild.getGuildId(), 
+            new GuildMembersListenerService.GuildMembersUpdateListener() {
+                @Override
+                public void onMemberAdded() {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            if (isAdded() && getContext() != null) {
+                                refreshGuildMembers();
+                            }
+                        });
+                    }
+                }
+                
+                @Override
+                public void onMemberRemoved() {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            if (isAdded() && getContext() != null) {
+                                refreshGuildMembers();
+                            }
+                        });
+                    }
+                }
+            });
+        
+        refreshGuildMembers();
+    }
+    
+    private void refreshGuildMembers() {
+        if (currentGuild == null) return;
         
         guildService.getGuildMembers(currentGuild.getGuildId(), new GuildService.GuildMemberListCallback() {
             @Override
@@ -272,11 +316,6 @@ public class GuildFragment extends Fragment {
     private void showCreateGuildDialog() {
         CreateGuildDialog dialog = new CreateGuildDialog();
         dialog.show(getParentFragmentManager(), "CreateGuildDialog");
-        
-        // Set up listener for dialog result
-        getParentFragmentManager().setFragmentResultListener("guild_created", this, (requestKey, bundle) -> {
-            loadData(); // Refresh data when guild is created
-        });
     }
     
     private void showInviteFriendsDialog() {
@@ -287,16 +326,11 @@ public class GuildFragment extends Fragment {
         
         GuildInviteDialog dialog = GuildInviteDialog.newInstance(currentGuild.getGuildId());
         dialog.show(getParentFragmentManager(), "GuildInviteDialog");
-        
-        // Set up listener for dialog result
-        getParentFragmentManager().setFragmentResultListener("invite_sent", this, (requestKey, bundle) -> {
-            Toast.makeText(requireContext(), "Invite sent successfully!", Toast.LENGTH_SHORT).show();
-        });
     }
     
     private void navigateToGuildChat() {
         if (currentGuild == null) {
-            Toast.makeText(requireContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+            // Removed noisy toast
             return;
         }
         
@@ -306,7 +340,7 @@ public class GuildFragment extends Fragment {
     private void leaveGuild() {
         if (currentGuild == null) {
             if (isAdded() && getContext() != null) {
-                Toast.makeText(getContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+                // Removed noisy toast
             }
             return;
         }
@@ -341,7 +375,7 @@ public class GuildFragment extends Fragment {
     
     private void disbandGuild() {
         if (currentGuild == null) {
-            Toast.makeText(requireContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+            // Removed noisy toast
             return;
         }
         
@@ -350,7 +384,14 @@ public class GuildFragment extends Fragment {
             public void onSuccess(String message, Guild guild) {
                 requireActivity().runOnUiThread(() -> {
                     Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
-                    loadData(); // Refresh data
+                    // Optimistically clear current UI state to avoid double-disband click
+                    GuildMembersListenerService.stopListening();
+                    currentGuild = null;
+                    guildMembers.clear();
+                    memberAdapter.notifyDataSetChanged();
+                    updateGuildUI();
+                    // Also reload from DB shortly after to ensure full sync
+                    loadData();
                 });
             }
             
@@ -409,6 +450,12 @@ public class GuildFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        loadData(); // Refresh data when fragment resumes
+        loadData();
+    }
+    
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        GuildMembersListenerService.stopListening();
     }
 }

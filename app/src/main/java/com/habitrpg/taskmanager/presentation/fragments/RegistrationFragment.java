@@ -88,7 +88,7 @@ public class RegistrationFragment extends Fragment {
                 requireActivity().runOnUiThread(() -> {
                     showLoading(false);
                     Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
-                    navigateToMain();
+                    showLoginFragment();
                 });
             }
             
@@ -135,12 +135,7 @@ public class RegistrationFragment extends Fragment {
         }
     }
     
-    private void navigateToMain() {
-        Intent intent = new Intent(requireContext(), MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        requireActivity().finish();
-    }
+    
     
     @Override
     public void onDestroyView() {
