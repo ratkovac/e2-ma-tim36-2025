@@ -83,6 +83,9 @@ public class GuildFragment extends Fragment {
     private void setupFragmentResultListeners() {
         getParentFragmentManager().setFragmentResultListener("guild_created", getViewLifecycleOwner(), (requestKey, bundle) -> {
             loadData();
+            // In case DB sync finishes slightly after result, refresh again shortly
+            android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+            handler.postDelayed(this::loadData, 400);
         });
         
         getParentFragmentManager().setFragmentResultListener("invite_sent", getViewLifecycleOwner(), (requestKey, bundle) -> {
@@ -150,10 +153,7 @@ public class GuildFragment extends Fragment {
                         if (isAdded() && getContext() != null) {
                             currentGuild = null;
                             updateGuildUI();
-                            // Show toast if user is not in any guild
-                            if (error.contains("not in any guild")) {
-                                Toast.makeText(getContext(), "You are not in any guild. Create one or wait for an invitation.", Toast.LENGTH_LONG).show();
-                            }
+                            // Silence toast when user is not in any guild
                         }
                     });
                 }
@@ -330,7 +330,7 @@ public class GuildFragment extends Fragment {
     
     private void navigateToGuildChat() {
         if (currentGuild == null) {
-            Toast.makeText(requireContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+            // Removed noisy toast
             return;
         }
         
@@ -340,7 +340,7 @@ public class GuildFragment extends Fragment {
     private void leaveGuild() {
         if (currentGuild == null) {
             if (isAdded() && getContext() != null) {
-                Toast.makeText(getContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+                // Removed noisy toast
             }
             return;
         }
@@ -375,7 +375,7 @@ public class GuildFragment extends Fragment {
     
     private void disbandGuild() {
         if (currentGuild == null) {
-            Toast.makeText(requireContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+            // Removed noisy toast
             return;
         }
         

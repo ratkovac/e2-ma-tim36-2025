@@ -132,7 +132,7 @@ public class GuildChatFragment extends Fragment {
             public void onError(String error) {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        Toast.makeText(requireContext(), "You are not in any guild", Toast.LENGTH_SHORT).show();
+                        // Removed noisy toast
                         requireActivity().onBackPressed();
                     });
                 }

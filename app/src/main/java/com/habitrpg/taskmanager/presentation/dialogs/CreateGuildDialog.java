@@ -79,11 +79,10 @@ public class CreateGuildDialog extends DialogFragment {
             return;
         }
         
-        // Send result to parent fragment and dismiss immediately
+        // Optimistic update: notify parent and keep dialog open briefly to avoid race
         Bundle result = new Bundle();
         result.putBoolean("guild_created", true);
         getParentFragmentManager().setFragmentResult("guild_created", result);
-        dismiss();
         
         // Create guild in background
         GuildService guildService = GuildService.getInstance(requireContext());
@@ -94,6 +93,11 @@ public class CreateGuildDialog extends DialogFragment {
                     getActivity().runOnUiThread(() -> {
                         if (getContext() != null) {
                             Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+                            // Notify parent again after actual creation to force refresh
+                            Bundle result = new Bundle();
+                            result.putBoolean("guild_created", true);
+                            getParentFragmentManager().setFragmentResult("guild_created", result);
+                            dismiss();
                         }
                     });
                 }
