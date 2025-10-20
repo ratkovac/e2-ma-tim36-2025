@@ -14,6 +14,8 @@ import com.habitrpg.taskmanager.data.database.dao.TaskCompletionDao;
 import com.habitrpg.taskmanager.data.database.dao.TaskDao;
 import com.habitrpg.taskmanager.data.database.dao.UserDao;
 import com.habitrpg.taskmanager.data.database.dao.UserStatisticsDao;
+import com.habitrpg.taskmanager.data.database.dao.SpecialMissionDao;
+import com.habitrpg.taskmanager.data.database.dao.SpecialMissionProgressDao;
 import com.habitrpg.taskmanager.data.database.entities.Boss;
 import com.habitrpg.taskmanager.data.database.entities.Category;
 import com.habitrpg.taskmanager.data.database.entities.Equipment;
@@ -50,6 +52,8 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract GuildDao guildDao();
     public abstract BossDao bossDao();
     public abstract EquipmentDao equipmentDao();
+    public abstract SpecialMissionDao specialMissionDao();
+    public abstract SpecialMissionProgressDao specialMissionProgressDao();
     
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {

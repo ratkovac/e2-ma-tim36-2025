@@ -8,6 +8,8 @@ import com.habitrpg.taskmanager.data.database.entities.GuildMember;
 import com.habitrpg.taskmanager.data.database.entities.GuildMessage;
 import com.habitrpg.taskmanager.data.repository.GuildRepository;
 import com.habitrpg.taskmanager.data.repository.UserRepository;
+import com.habitrpg.taskmanager.data.repository.SpecialMissionRepository;
+import com.habitrpg.taskmanager.data.database.entities.SpecialMission;
 import com.habitrpg.taskmanager.service.UserPreferences;
 
 import java.util.List;
@@ -19,12 +21,38 @@ public class GuildService {
     private final UserRepository userRepository;
     private final UserPreferences userPreferences;
     private final NotificationService notificationService;
+    private final SpecialMissionRepository specialMissionRepository;
     
     private GuildService(Context context) {
         this.guildRepository = GuildRepository.getInstance(context);
         this.userRepository = UserRepository.getInstance(context);
         this.userPreferences = UserPreferences.getInstance(context);
         this.notificationService = NotificationService.getInstance(context);
+        this.specialMissionRepository = SpecialMissionRepository.getInstance(context);
+    }
+    public void startSpecialMission(String guildId, GuildMissionCallback callback) {
+        String currentUserId = userPreferences.getCurrentUserId();
+        if (currentUserId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+
+        specialMissionRepository.startMissionForGuild(guildId, currentUserId, new SpecialMissionRepository.StartMissionCallback() {
+            @Override
+            public void onSuccess(String message, SpecialMission mission) {
+                callback.onSuccess(message, mission);
+            }
+
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+        });
+    }
+
+    public interface GuildMissionCallback {
+        void onSuccess(String message, SpecialMission mission);
+        void onError(String error);
     }
     
     public static synchronized GuildService getInstance(Context context) {

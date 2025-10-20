@@ -14,11 +14,13 @@ public class EquipmentService {
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
     private final UserPreferences userPreferences;
+    private final com.habitrpg.taskmanager.data.repository.SpecialMissionRepository specialMissionRepository;
 
     private EquipmentService(Context context) {
         equipmentRepository = EquipmentRepository.getInstance(context);
         userRepository = UserRepository.getInstance(context);
         userPreferences = UserPreferences.getInstance(context);
+        specialMissionRepository = com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.getInstance(context);
     }
 
     public static EquipmentService getInstance(Context context) {
@@ -134,7 +136,24 @@ public class EquipmentService {
                                 bonusDuration, new EquipmentRepository.EquipmentCallback() {
                                     @Override
                                     public void onSuccess(String message, List<Equipment> equipment) {
-                                        callback.onSuccess(message, equipment);
+                                        // After successful purchase, try to update special mission progress
+                                        specialMissionRepository.recordShopPurchase(currentUserId, new com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.ProgressUpdateCallback() {
+                                            @Override
+                                            public void onUpdated(String updateMsg) {
+                                                callback.onSuccess(message, equipment);
+                                            }
+
+                                            @Override
+                                            public void onNoActiveMission() {
+                                                callback.onSuccess(message, equipment);
+                                            }
+
+                                            @Override
+                                            public void onError(String error) {
+                                                // Mission progress failure shouldn't block purchase success
+                                                callback.onSuccess(message, equipment);
+                                            }
+                                        });
                                     }
 
                                     @Override
