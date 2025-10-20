@@ -27,11 +27,14 @@ import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.data.database.entities.TaskCompletion;
 import com.habitrpg.taskmanager.data.database.entities.User;
 import com.habitrpg.taskmanager.data.database.entities.UserStatistics;
+import com.habitrpg.taskmanager.data.database.entities.SpecialMission;
+import com.habitrpg.taskmanager.data.database.entities.SpecialMissionProgress;
 
 @Database(
         entities = {User.class, Category.class, Task.class, TaskCompletion.class, UserStatistics.class, 
-                    Friend.class, FriendRequest.class, Guild.class, GuildMember.class, GuildInvite.class, GuildMessage.class, Boss.class, Equipment.class},
-    version = 8,
+                    Friend.class, FriendRequest.class, Guild.class, GuildMember.class, GuildInvite.class, GuildMessage.class, Boss.class, Equipment.class,
+                    SpecialMission.class, SpecialMissionProgress.class},
+    version = 9,
     exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
