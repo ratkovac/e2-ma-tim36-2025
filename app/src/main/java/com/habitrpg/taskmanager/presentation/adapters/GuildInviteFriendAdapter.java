@@ -94,3 +94,4 @@ public class GuildInviteFriendAdapter extends RecyclerView.Adapter<GuildInviteFr
 }
 
 
+
