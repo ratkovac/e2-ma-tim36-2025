@@ -366,6 +366,66 @@ public class SpecialMissionRepository {
 			}
 		});
 	}
+
+	public void recordGuildMessageDay(String userId, ProgressUpdateCallback callback) {
+		ensureExecutorActive();
+		executor.execute(() -> {
+			try {
+				GuildMember member = guildDao.getGuildMemberByUserId(userId);
+				if (member == null) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				SpecialMission mission = specialMissionDao.getActiveMissionByGuild(member.getGuildId());
+				if (mission == null) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				long now = System.currentTimeMillis();
+				if (now > mission.getEndDate()) {
+					callback.onNoActiveMission();
+					return;
+				}
+
+				java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+				String todayKey = sdf.format(new java.util.Date(now));
+
+				SpecialMissionProgress progress = progressDao.getByMissionAndUser(mission.getId(), userId);
+				if (progress == null) {
+					progress = new SpecialMissionProgress();
+					progress.setSpecialMissionId(mission.getId());
+					progress.setUserId(userId);
+				}
+
+				java.util.Set<String> days = progress.parseDaysWithMessages();
+				if (days.contains(todayKey)) {
+					callback.onUpdated("Guild message already counted today");
+					return;
+				}
+				days.add(todayKey);
+				progress.setDaysWithMessagesFromSet(days);
+
+				int damage = 4;
+				int newHp = Math.max(0, mission.getCurrentBossHP() - damage);
+				mission.setCurrentBossHP(newHp);
+				if (newHp == 0) {
+					mission.setStatus(SpecialMission.STATUS_COMPLETED);
+					mission.setSuccessful(true);
+					guildDao.updateGuildMissionStatus(member.getGuildId(), false);
+				}
+				specialMissionDao.update(mission);
+
+				progress.setTotalDamageDealt(progress.getTotalDamageDealt() + damage);
+				progressDao.insert(progress);
+
+				callback.onUpdated("Special mission updated: guild message -4 HP");
+			} catch (Exception e) {
+				callback.onError("Failed to update guild message progress: " + e.getMessage());
+			}
+		});
+	}
 }
 
 

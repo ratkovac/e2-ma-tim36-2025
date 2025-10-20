@@ -414,6 +414,12 @@ public class GuildService {
                     guildRepository.sendGuildMessage(guildId, currentUserId, user.getUsername(), messageText, new GuildRepository.GuildMessageCallback() {
                         @Override
                         public void onSuccess(String message, List<GuildMessage> messages) {
+                            // After success, record special mission message-day progress
+                            specialMissionRepository.recordGuildMessageDay(currentUserId, new SpecialMissionRepository.ProgressUpdateCallback() {
+                                @Override public void onUpdated(String msg) { /* no-op */ }
+                                @Override public void onNoActiveMission() { /* no-op */ }
+                                @Override public void onError(String error) { /* no-op */ }
+                            });
                             callback.onSuccess(message, messages);
                         }
                         
