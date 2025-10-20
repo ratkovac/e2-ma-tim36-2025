@@ -63,6 +63,12 @@ public class GuildChatListenerService {
                                 guildRepository.insertGuildMessageSync(message);
                                 System.out.println("Guild message synced from Firebase: " + username);
                                 
+                                try {
+                                    // Echo notifications even for own messages for demo purposes
+                                    NotificationService.getInstance(appContext)
+                                        .showGuildMessageNotification(guildId, null, username, messageText);
+                                } catch (Exception ignored) {}
+                                
                                 if (updateListener != null) {
                                     updateListener.onNewMessage();
                                 }

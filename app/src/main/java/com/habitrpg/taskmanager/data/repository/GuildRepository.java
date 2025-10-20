@@ -168,14 +168,13 @@ public class GuildRepository {
                     return;
                 }
                 
-                // Deactivate guild
+                // Deactivate guild and remove related data
                 guildDao.deactivateGuild(guildId);
-                
-                // Remove all members
                 guildDao.deleteAllGuildMembers(guildId);
-                
-                // Delete all invites
                 guildDao.deleteAllGuildInvites(guildId);
+                guildDao.deleteAllGuildMessages(guildId);
+                // Hard delete guild row
+                guildDao.deleteGuild(guild);
                 
                 // Sync with Firebase
                 firebaseManager.disbandGuildDocument(guildId, 

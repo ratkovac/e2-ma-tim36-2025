@@ -384,7 +384,14 @@ public class GuildFragment extends Fragment {
             public void onSuccess(String message, Guild guild) {
                 requireActivity().runOnUiThread(() -> {
                     Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
-                    loadData(); // Refresh data
+                    // Optimistically clear current UI state to avoid double-disband click
+                    GuildMembersListenerService.stopListening();
+                    currentGuild = null;
+                    guildMembers.clear();
+                    memberAdapter.notifyDataSetChanged();
+                    updateGuildUI();
+                    // Also reload from DB shortly after to ensure full sync
+                    loadData();
                 });
             }
             
