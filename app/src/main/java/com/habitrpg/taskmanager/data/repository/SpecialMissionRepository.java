@@ -30,6 +30,56 @@ public class SpecialMissionRepository {
 		void onError(String error);
 	}
 
+	public static class ProgressSummary {
+		public boolean hasActiveMission;
+		public int shopPurchases;
+		public int regularBossHits;
+		public int easyTasksCompleted;
+		public int otherTasksCompleted;
+		public boolean hasNoUnresolvedTasks;
+		public int daysWithMessagesCount;
+		public int hpFromShop;
+		public int hpFromRegularHits;
+		public int hpFromEasyTasks;
+		public int hpFromOtherTasks;
+		public int hpFromNoUnresolved;
+		public int hpFromMessages;
+		public int totalHp;
+	}
+
+	public interface ProgressSummaryCallback {
+		void onSuccess(ProgressSummary summary);
+		void onNoActiveMission();
+		void onError(String error);
+	}
+
+	public static class GuildMemberProgress {
+		public String userId;
+		public String username;
+		public int shopPurchases;
+		public int regularBossHits;
+		public int easyTasksCompleted;
+		public int otherTasksCompleted;
+		public boolean hasNoUnresolvedTasks;
+		public int daysWithMessagesCount;
+		public int totalHp;
+	}
+
+	public static class GuildProgressSummary {
+		public boolean hasActiveMission;
+		public String missionId;
+		public int initialBossHp;
+		public int currentBossHp;
+		public long endDate;
+		public java.util.List<GuildMemberProgress> members;
+	}
+
+	public interface GuildProgressSummaryCallback {
+		void onSuccess(GuildProgressSummary summary);
+		void onNoActiveMission();
+		void onError(String error);
+	}
+
 	private static SpecialMissionRepository instance;
 	private final GuildDao guildDao;
 	private final SpecialMissionDao specialMissionDao;
@@ -423,6 +473,108 @@ public class SpecialMissionRepository {
 				callback.onUpdated("Special mission updated: guild message -4 HP");
 			} catch (Exception e) {
 				callback.onError("Failed to update guild message progress: " + e.getMessage());
+			}
+		});
+	}
+
+	public void getUserProgressSummary(String userId, ProgressSummaryCallback callback) {
+		ensureExecutorActive();
+		executor.execute(() -> {
+			try {
+				GuildMember member = guildDao.getGuildMemberByUserId(userId);
+				if (member == null) { callback.onNoActiveMission(); return; }
+				SpecialMission mission = specialMissionDao.getActiveMissionByGuild(member.getGuildId());
+				if (mission == null) { callback.onNoActiveMission(); return; }
+
+				SpecialMissionProgress progress = progressDao.getByMissionAndUser(mission.getId(), userId);
+				ProgressSummary s = new ProgressSummary();
+				s.hasActiveMission = true;
+				if (progress != null) {
+					s.shopPurchases = Math.min(5, Math.max(0, progress.getShopPurchases()));
+					s.regularBossHits = Math.min(10, Math.max(0, progress.getRegularBossHits()));
+					s.easyTasksCompleted = Math.min(10, Math.max(0, progress.getEasyTasksCompleted()));
+					s.otherTasksCompleted = Math.min(6, Math.max(0, progress.getOtherTasksCompleted()));
+					s.hasNoUnresolvedTasks = progress.isHasNoUnresolvedTasks();
+					java.util.Set<String> days = progress.parseDaysWithMessages();
+					s.daysWithMessagesCount = days != null ? days.size() : 0;
+				} else {
+					s.shopPurchases = 0;
+					s.regularBossHits = 0;
+					s.easyTasksCompleted = 0;
+					s.otherTasksCompleted = 0;
+					s.hasNoUnresolvedTasks = false;
+					s.daysWithMessagesCount = 0;
+				}
+
+				s.hpFromShop = s.shopPurchases * 2;
+				s.hpFromRegularHits = s.regularBossHits * 2;
+				s.hpFromEasyTasks = s.easyTasksCompleted * 1;
+				s.hpFromOtherTasks = s.otherTasksCompleted * 4;
+				s.hpFromNoUnresolved = s.hasNoUnresolvedTasks ? 10 : 0;
+				s.hpFromMessages = s.daysWithMessagesCount * 4;
+				s.totalHp = s.hpFromShop + s.hpFromRegularHits + s.hpFromEasyTasks + s.hpFromOtherTasks + s.hpFromNoUnresolved + s.hpFromMessages;
+
+				callback.onSuccess(s);
+			} catch (Exception e) {
+				callback.onError("Failed to load progress summary: " + e.getMessage());
+			}
+		});
+	}
+
+	public void getGuildProgressSummary(String guildId, GuildProgressSummaryCallback callback) {
+		ensureExecutorActive();
+		executor.execute(() -> {
+			try {
+				SpecialMission mission = specialMissionDao.getActiveMissionByGuild(guildId);
+				if (mission == null) { callback.onNoActiveMission(); return; }
+
+				java.util.List<GuildMember> members = guildDao.getGuildMembersByGuildId(guildId);
+				java.util.List<SpecialMissionProgress> progresses = progressDao.getAllForMission(mission.getId());
+				java.util.Map<String, SpecialMissionProgress> byUser = new java.util.HashMap<>();
+				for (SpecialMissionProgress p : progresses) { byUser.put(p.getUserId(), p); }
+
+				GuildProgressSummary g = new GuildProgressSummary();
+				g.hasActiveMission = true;
+				g.missionId = mission.getId();
+				g.initialBossHp = mission.getInitialBossHP();
+				g.currentBossHp = mission.getCurrentBossHP();
+				g.endDate = mission.getEndDate();
+				g.members = new java.util.ArrayList<>();
+
+				for (GuildMember m : members) {
+					GuildMemberProgress mp = new GuildMemberProgress();
+					mp.userId = m.getUserId();
+					mp.username = m.getUsername();
+					SpecialMissionProgress p = byUser.get(m.getUserId());
+					if (p != null) {
+						mp.shopPurchases = Math.min(5, Math.max(0, p.getShopPurchases()));
+						mp.regularBossHits = Math.min(10, Math.max(0, p.getRegularBossHits()));
+						mp.easyTasksCompleted = Math.min(10, Math.max(0, p.getEasyTasksCompleted()));
+						mp.otherTasksCompleted = Math.min(6, Math.max(0, p.getOtherTasksCompleted()));
+						mp.hasNoUnresolvedTasks = p.isHasNoUnresolvedTasks();
+						java.util.Set<String> days = p.parseDaysWithMessages();
+						mp.daysWithMessagesCount = days != null ? days.size() : 0;
+					} else {
+						mp.shopPurchases = 0;
+						mp.regularBossHits = 0;
+						mp.easyTasksCompleted = 0;
+						mp.otherTasksCompleted = 0;
+						mp.hasNoUnresolvedTasks = false;
+						mp.daysWithMessagesCount = 0;
+					}
+					int hpFromShop = mp.shopPurchases * 2;
+					int hpFromHits = mp.regularBossHits * 2;
+					int hpFromEasy = mp.easyTasksCompleted * 1;
+					int hpFromOther = mp.otherTasksCompleted * 4;
+					int hpFromNoUnresolved = mp.hasNoUnresolvedTasks ? 10 : 0;
+					int hpFromMsgs = mp.daysWithMessagesCount * 4;
+					mp.totalHp = hpFromShop + hpFromHits + hpFromEasy + hpFromOther + hpFromNoUnresolved + hpFromMsgs;
+					g.members.add(mp);
+				}
+
+				callback.onSuccess(g);
+			} catch (Exception e) {
+				callback.onError("Failed to load guild progress: " + e.getMessage());
 			}
 		});
 	}
