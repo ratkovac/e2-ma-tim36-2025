@@ -181,11 +181,19 @@ public class BossFightFragment extends Fragment {
     }
 
     private void loadActiveEquipment() {
-        equipmentService.getActiveEquipment(new EquipmentService.EquipmentCallback() {
+        equipmentService.getUserEquipment(new EquipmentService.EquipmentCallback() {
             @Override
             public void onSuccess(String message, List<Equipment> equipment) {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
+                        // Debug log
+                        System.out.println("DEBUG loadActiveEquipment: Total equipment loaded: " + equipment.size());
+                        for (Equipment item : equipment) {
+                            System.out.println("DEBUG loadActiveEquipment: Equipment: " + item.getEquipmentName() + 
+                                             ", isActive: " + item.isActive() + 
+                                             ", iconResource: " + item.getIconResource());
+                        }
+                        
                         calculateEquipmentBonuses(equipment);
                         updateEquipmentDisplay();
                         loadCurrentBoss();
@@ -371,12 +379,20 @@ public class BossFightFragment extends Fragment {
         // Hide no equipment text initially
         noEquipmentText.setVisibility(View.GONE);
 
-        // Get active equipment and display their icons
-        equipmentService.getActiveEquipment(new EquipmentService.EquipmentCallback() {
+        // Get user equipment and display active equipment icons
+        equipmentService.getUserEquipment(new EquipmentService.EquipmentCallback() {
             @Override
             public void onSuccess(String message, List<Equipment> equipment) {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
+                        // Debug log
+                        System.out.println("DEBUG: Total equipment loaded: " + equipment.size());
+                        for (Equipment item : equipment) {
+                            System.out.println("DEBUG: Equipment: " + item.getEquipmentName() + 
+                                             ", isActive: " + item.isActive() + 
+                                             ", iconResource: " + item.getIconResource());
+                        }
+                        
                         boolean hasActiveEquipment = false;
                         
                         for (Equipment item : equipment) {
@@ -403,12 +419,8 @@ public class BossFightFragment extends Fragment {
                                 params.setMargins(0, 0, (int) (8 * getResources().getDisplayMetrics().density), 0);
                                 equipmentIcon.setLayoutParams(params);
                                 
-                                // Set the icon resource
-                                String iconResourceName = item.getIconResource();
-                                if (iconResourceName == null || iconResourceName.isEmpty()) {
-                                    iconResourceName = "ic_potion1"; // Default icon
-                                }
-                                int iconResource = getIconResource(iconResourceName);
+                                // Set icon based on icon resource name
+                                int iconResource = getIconResource(item.getIconResource());
                                 equipmentIcon.setImageResource(iconResource);
                                 equipmentIcon.setScaleType(ImageView.ScaleType.CENTER_CROP);
                                 equipmentIcon.setContentDescription(item.getEquipmentName());
@@ -838,9 +850,6 @@ public class BossFightFragment extends Fragment {
             navigateToTasks();
         });
         
-        // Start listening for shake
-        sensorManager.registerListener(shakeListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-        
         // Store dialog reference for shake detection
         final Dialog finalDialog = dialog;
         final ImageView finalTreasureChest = treasureChest;
@@ -848,8 +857,8 @@ public class BossFightFragment extends Fragment {
         final TextView finalEquipmentText = equipmentText;
         final MaterialButton finalExitButton = exitButton;
         
-        // Override onShakeDetected for this dialog
-        shakeListener = new SensorEventListener() {
+        // Create new shake listener for treasure dialog
+        SensorEventListener treasureShakeListener = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
                 float x = event.values[0];
@@ -871,11 +880,15 @@ public class BossFightFragment extends Fragment {
             public void onAccuracyChanged(Sensor sensor, int accuracy) {}
         };
         
+        // Unregister the main shake listener and register the treasure shake listener
+        sensorManager.unregisterListener(shakeListener);
+        sensorManager.registerListener(treasureShakeListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        
         dialog.show();
     }
     
     private void openTreasureChest(ImageView treasureChest, TextView coinsText, TextView equipmentText, MaterialButton exitButton, Dialog dialog) {
-        // Stop listening for shake
+        // Stop listening for shake - unregister all listeners
         sensorManager.unregisterListener(shakeListener);
         
         // Change to open chest image
@@ -923,6 +936,11 @@ public class BossFightFragment extends Fragment {
             equipmentAnimator.setDuration(500);
             equipmentAnimator.setStartDelay(200);
             equipmentAnimator.start();
+        }
+        
+        // Re-register the main shake listener for future boss fights
+        if (sensorManager != null && shakeListener != null && accelerometer != null) {
+            sensorManager.registerListener(shakeListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         }
         
         // Animate exit button appearing

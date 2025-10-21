@@ -30,7 +30,7 @@ public class BossService {
     private static final int MAX_ATTACKS = 5;
     private static final int BASE_COIN_REWARD = 200;
     private static final double COIN_INCREASE_RATE = 0.20; // 20% increase
-    private static final double EQUIPMENT_DROP_CHANCE = 1.0; // 100% chance - always drop equipment
+    private static final double EQUIPMENT_DROP_CHANCE = 0.20; // 20% chance - reduced from 100%
     private static final double CLOTHING_DROP_CHANCE = 0.50; // 50% of equipment drops
     private static final double WEAPON_DROP_CHANCE = 0.50; // 50% of equipment drops
     private static final double PARTIAL_VICTORY_THRESHOLD = 0.50; // 50% HP damage for partial victory

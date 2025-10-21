@@ -564,8 +564,38 @@ public class TaskService {
             return;
         }
         
-        // Proceed with update directly - no quota validation needed
-        performTaskUpdate(task, callback);
+        // First get the original task from database to check if it's recurring
+        taskRepository.getTaskById(task.getId(), new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to get task: " + error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task originalTask) {
+                if (originalTask == null) {
+                    callback.onError("Task not found");
+                    return;
+                }
+                
+                // Check if this is a recurring task and validate edit permissions
+                if (originalTask.isRecurring()) {
+                    validateRecurringTaskEdit(originalTask, task, callback);
+                } else {
+                    // Proceed with update directly for non-recurring tasks
+                    performTaskUpdate(task, callback);
+                }
+            }
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
     }
     
     private void performTaskUpdate(Task task, TaskCallback callback) {
@@ -592,6 +622,226 @@ public class TaskService {
             @Override
             public void onTaskCountRetrieved(int count) {}
         });
+    }
+    
+    private void validateRecurringTaskEdit(Task originalTask, Task updatedTask, TaskCallback callback) {
+        // Check if the original task's start_date is in the future
+        if (originalTask.getStartDate() == null || originalTask.getStartDate().isEmpty()) {
+            callback.onError("Recurring task must have a start date");
+            return;
+        }
+        
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+            java.util.Date taskDateTime = sdf.parse(originalTask.getStartDate());
+            java.util.Date currentDateTime = sdf.parse(DateUtils.getCurrentDateTimeString());
+            
+            // Only allow editing if start_date is in the future
+            if (taskDateTime.compareTo(currentDateTime) <= 0) {
+                callback.onError("Only future recurring tasks can be edited");
+                return;
+            }
+            
+            // Validate that only name and description can be changed
+            if (!isRecurringTaskEditValid(originalTask, updatedTask)) {
+                callback.onError("For recurring tasks, only name and description can be modified");
+                return;
+            }
+            
+            // If validation passes, update the current task and all future instances
+            updateRecurringTaskAndFutureInstances(originalTask, updatedTask, callback);
+            
+        } catch (Exception e) {
+            callback.onError("Invalid date format: " + e.getMessage());
+        }
+    }
+    
+    private boolean isRecurringTaskEditValid(Task originalTask, Task updatedTask) {
+        // Only allow changes to name and description
+        boolean nameChanged = !originalTask.getName().equals(updatedTask.getName());
+        boolean descriptionChanged = !java.util.Objects.equals(originalTask.getDescription(), updatedTask.getDescription());
+        
+        // Check if any other fields were changed
+        boolean categoryChanged = originalTask.getCategoryId() != updatedTask.getCategoryId();
+        boolean difficultyChanged = !originalTask.getDifficulty().equals(updatedTask.getDifficulty());
+        boolean importanceChanged = !originalTask.getImportance().equals(updatedTask.getImportance());
+        boolean recurringChanged = originalTask.isRecurring() != updatedTask.isRecurring();
+        boolean recurrenceIntervalChanged = originalTask.getRecurrenceInterval() != updatedTask.getRecurrenceInterval();
+        boolean recurrenceUnitChanged = !java.util.Objects.equals(originalTask.getRecurrenceUnit(), updatedTask.getRecurrenceUnit());
+        boolean startDateChanged = !java.util.Objects.equals(originalTask.getStartDate(), updatedTask.getStartDate());
+        boolean endDateChanged = !java.util.Objects.equals(originalTask.getEndDate(), updatedTask.getEndDate());
+        boolean statusChanged = !originalTask.getStatus().equals(updatedTask.getStatus());
+        
+        // Only name and description changes are allowed
+        return !categoryChanged && !difficultyChanged && !importanceChanged && 
+               !recurringChanged && !recurrenceIntervalChanged && !recurrenceUnitChanged && 
+               !startDateChanged && !endDateChanged && !statusChanged &&
+               (nameChanged || descriptionChanged);
+    }
+    
+    private void updateRecurringTaskAndFutureInstances(Task originalTask, Task updatedTask, TaskCallback callback) {
+        // Create a task with only the allowed changes (name and description)
+        Task taskToUpdate = new Task();
+        taskToUpdate.setId(originalTask.getId());
+        taskToUpdate.setUserId(originalTask.getUserId());
+        taskToUpdate.setCategoryId(originalTask.getCategoryId());
+        taskToUpdate.setName(updatedTask.getName()); // Allow name change
+        taskToUpdate.setDescription(updatedTask.getDescription()); // Allow description change
+        taskToUpdate.setDifficulty(originalTask.getDifficulty()); // Keep original
+        taskToUpdate.setImportance(originalTask.getImportance()); // Keep original
+        taskToUpdate.setXpValue(originalTask.getXpValue()); // Keep original
+        taskToUpdate.setRecurring(originalTask.isRecurring()); // Keep original
+        taskToUpdate.setRecurrenceInterval(originalTask.getRecurrenceInterval()); // Keep original
+        taskToUpdate.setRecurrenceUnit(originalTask.getRecurrenceUnit()); // Keep original
+        taskToUpdate.setStartDate(originalTask.getStartDate()); // Keep original
+        taskToUpdate.setEndDate(originalTask.getEndDate()); // Keep original
+        taskToUpdate.setStatus(originalTask.getStatus()); // Keep original
+        
+        // First update the current task
+        taskRepository.updateTask(taskToUpdate, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {
+                // Now find and update all future instances
+                findAndUpdateFutureRecurringInstances(originalTask, updatedTask, callback);
+            }
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to update recurring task: " + error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private void findAndUpdateFutureRecurringInstances(Task originalTask, Task updatedTask, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        
+        // Get all tasks for the user
+        taskRepository.getAllTasks(userId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to get tasks for update: " + error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> allTasks) {
+                if (allTasks == null) {
+                    callback.onSuccess("Recurring task and future instances updated successfully");
+                    return;
+                }
+                
+                // Find all future instances of the recurring task
+                List<Task> tasksToUpdate = new java.util.ArrayList<>();
+                String currentDate = DateUtils.getCurrentDateString();
+                
+                // Extract base task name (without date in parentheses)
+                String baseTaskName = extractBaseTaskName(originalTask.getName());
+                
+                for (Task task : allTasks) {
+                    // Check if it's a recurring task
+                    if (!task.isRecurring()) {
+                        continue;
+                    }
+                    
+                    // Check if it has the same base name
+                    String taskBaseName = extractBaseTaskName(task.getName());
+                    if (!baseTaskName.equals(taskBaseName)) {
+                        continue;
+                    }
+                    
+                    // Check if it's a future task (not completed)
+                    if ("completed".equals(task.getStatus())) {
+                        continue; // Don't update completed tasks
+                    }
+                    
+                    // Check if the date is in the future or today
+                    if (task.getStartDate() != null && !task.getStartDate().isEmpty()) {
+                        String taskDate = task.getStartDate().split(" ")[0]; // Get only date part
+                        if (taskDate.compareTo(currentDate) >= 0) {
+                            tasksToUpdate.add(task);
+                        }
+                    }
+                }
+                
+                // Update all found future instances
+                updateTasksInBatch(tasksToUpdate, originalTask, updatedTask, callback);
+            }
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private void updateTasksInBatch(List<Task> tasksToUpdate, Task originalTask, Task updatedTask, TaskCallback callback) {
+        if (tasksToUpdate.isEmpty()) {
+            callback.onSuccess("Recurring task and future instances updated successfully");
+            return;
+        }
+        
+        final int[] updatedCount = {0};
+        final int totalTasks = tasksToUpdate.size();
+        
+        for (Task task : tasksToUpdate) {
+            // Create a copy with only the allowed changes (name and description)
+            Task updatedTaskInstance = new Task();
+            updatedTaskInstance.setId(task.getId());
+            updatedTaskInstance.setUserId(task.getUserId());
+            updatedTaskInstance.setCategoryId(originalTask.getCategoryId());
+            
+            // Update name with new base name but keep the date part
+            String newBaseName = extractBaseTaskName(updatedTask.getName());
+            String taskDate = task.getStartDate().split(" ")[0];
+            updatedTaskInstance.setName(newBaseName + " (" + taskDate + ")");
+            
+            updatedTaskInstance.setDescription(updatedTask.getDescription()); // Allow description change
+            updatedTaskInstance.setDifficulty(originalTask.getDifficulty()); // Keep original
+            updatedTaskInstance.setImportance(originalTask.getImportance()); // Keep original
+            updatedTaskInstance.setXpValue(originalTask.getXpValue()); // Keep original
+            updatedTaskInstance.setRecurring(true);
+            updatedTaskInstance.setRecurrenceInterval(originalTask.getRecurrenceInterval());
+            updatedTaskInstance.setRecurrenceUnit(originalTask.getRecurrenceUnit());
+            updatedTaskInstance.setStartDate(task.getStartDate()); // Keep the original date
+            updatedTaskInstance.setEndDate(originalTask.getEndDate());
+            updatedTaskInstance.setStatus(task.getStatus()); // Keep the original status
+            
+            taskRepository.updateTask(updatedTaskInstance, new TaskRepository.TaskCallback() {
+                @Override
+                public void onSuccess(String message) {
+                    updatedCount[0]++;
+                    if (updatedCount[0] == totalTasks) {
+                        callback.onSuccess("Recurring task and " + totalTasks + " future instances updated successfully");
+                    }
+                }
+                
+                @Override
+                public void onError(String error) {
+                    callback.onError("Failed to update some recurring task instances: " + error);
+                }
+                
+                @Override
+                public void onTaskRetrieved(Task task) {}
+                
+                @Override
+                public void onTasksRetrieved(List<Task> tasks) {}
+                
+                @Override
+                public void onTaskCountRetrieved(int count) {}
+            });
+        }
     }
     
     public void cancelTask(int taskId, TaskCallback callback) {
