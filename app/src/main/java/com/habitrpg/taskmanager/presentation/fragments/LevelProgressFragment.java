@@ -63,7 +63,13 @@ public class LevelProgressFragment extends Fragment {
         binding.tvCurrentLevel.setText(String.valueOf(currentLevel));
         binding.tvCurrentTitle.setText(XPService.getTitleForLevel(currentLevel));
         binding.tvCurrentPP.setText(String.valueOf(powerPoints));
-        binding.tvCurrentXP.setText(String.valueOf(totalXP));
+        
+        // Prikaži totalni XP sa brojem bedževa
+        String xpText = String.valueOf(totalXP);
+        if (currentUser.getBadgesCount() > 0) {
+            xpText += " | " + currentUser.getBadgesCount() + " 🏆";
+        }
+        binding.tvCurrentXP.setText(xpText);
 
         // Calculate XP for current level progress
         int xpForNextLevel = XPService.getTotalXPRequiredForLevel(currentLevel + 1);

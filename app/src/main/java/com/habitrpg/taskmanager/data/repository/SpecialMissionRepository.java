@@ -634,11 +634,12 @@ public class SpecialMissionRepository {
 				if (victory) {
 					// Rewards for all guild members
 					java.util.List<GuildMember> members = guildDao.getGuildMembersByGuildId(guildId);
-					for (GuildMember gm : members) {
-						grantPotionAndClothingSafe(gm.getUserId());
-						grantHalfNextBossCoinsSafe(gm.getUserId());
-						incrementUserStatsCompletedSafe(gm.getUserId());
-					}
+				for (GuildMember gm : members) {
+					grantPotionAndClothingSafe(gm.getUserId());
+					grantHalfNextBossCoinsSafe(gm.getUserId());
+					incrementUserStatsCompletedSafe(gm.getUserId());
+					grantBadgeSafe(gm.getUserId());
+				}
 					mission.setStatus(SpecialMission.STATUS_COMPLETED);
 					mission.setSuccessful(true);
 				} else {
@@ -664,6 +665,7 @@ public class SpecialMissionRepository {
 					grantPotionAndClothingSafe(member.getUserId());
 					grantHalfNextBossCoinsSafe(member.getUserId());
 					incrementUserStatsCompletedSafe(member.getUserId());
+					grantBadgeSafe(member.getUserId());
 				}
 				
 				// Prikaži Toast poruku korisniku koji je poslednji napao boss-a
@@ -734,6 +736,15 @@ public class SpecialMissionRepository {
             }
             us.setTotalSpecialMissionsCompleted(us.getTotalSpecialMissionsCompleted() + 1);
             userStatisticsDao.insertUserStatistics(us);
+        } catch (Exception ignored) {}
+    }
+
+    private void grantBadgeSafe(String userId) {
+        try {
+            com.habitrpg.taskmanager.data.database.entities.User user = userDao.getUserById(userId);
+            if (user == null) return;
+            user.setBadgesCount(user.getBadgesCount() + 1);
+            userDao.updateUser(user);
         } catch (Exception ignored) {}
     }
 }
