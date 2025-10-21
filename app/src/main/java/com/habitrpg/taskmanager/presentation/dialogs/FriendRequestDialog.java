@@ -51,23 +51,36 @@ public class FriendRequestDialog extends DialogFragment {
                 .setPositiveButton(buttonText, (dialogInterface, which) -> {
                     FriendService friendService = FriendService.getInstance(requireContext());
 
+                    shouldRefresh = true;
+                    
+                    Bundle result = new Bundle();
+                    result.putBoolean("handled", true);
+                    getParentFragmentManager().setFragmentResult("friend_request_handled", result);
+                    
+                    dismiss();
+                    
                     if (isAccept) {
                         friendService.acceptFriendRequest(friendRequest.getId(), new FriendService.FriendCallback() {
                             @Override
                             public void onSuccess(String message) {
-                                requireActivity().runOnUiThread(() -> {
-                                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
-                                    shouldRefresh = true;
-                                    dismiss();
-                                });
+                                if (getActivity() != null && isAdded()) {
+                                    getActivity().runOnUiThread(() -> {
+                                        if (getContext() != null) {
+                                            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+                                        }
+                                    });
+                                }
                             }
 
                             @Override
                             public void onError(String error) {
-                                requireActivity().runOnUiThread(() -> {
-                                    Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show();
-                                    dismiss();
-                                });
+                                if (getActivity() != null && isAdded()) {
+                                    getActivity().runOnUiThread(() -> {
+                                        if (getContext() != null) {
+                                            Toast.makeText(getContext(), error, Toast.LENGTH_SHORT).show();
+                                        }
+                                    });
+                                }
                             }
 
                             @Override
@@ -77,19 +90,24 @@ public class FriendRequestDialog extends DialogFragment {
                         friendService.declineFriendRequest(friendRequest.getId(), new FriendService.FriendCallback() {
                             @Override
                             public void onSuccess(String message) {
-                                requireActivity().runOnUiThread(() -> {
-                                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
-                                    shouldRefresh = true;
-                                    dismiss();
-                                });
+                                if (getActivity() != null && isAdded()) {
+                                    getActivity().runOnUiThread(() -> {
+                                        if (getContext() != null) {
+                                            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+                                        }
+                                    });
+                                }
                             }
 
                             @Override
                             public void onError(String error) {
-                                requireActivity().runOnUiThread(() -> {
-                                    Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show();
-                                    dismiss();
-                                });
+                                if (getActivity() != null && isAdded()) {
+                                    getActivity().runOnUiThread(() -> {
+                                        if (getContext() != null) {
+                                            Toast.makeText(getContext(), error, Toast.LENGTH_SHORT).show();
+                                        }
+                                    });
+                                }
                             }
 
                             @Override

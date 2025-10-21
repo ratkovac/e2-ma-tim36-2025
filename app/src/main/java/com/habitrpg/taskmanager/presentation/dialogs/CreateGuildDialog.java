@@ -79,30 +79,42 @@ public class CreateGuildDialog extends DialogFragment {
             return;
         }
         
-        // Create guild
+        // Optimistic update: notify parent and keep dialog open briefly to avoid race
+        Bundle result = new Bundle();
+        result.putBoolean("guild_created", true);
+        getParentFragmentManager().setFragmentResult("guild_created", result);
+        
+        // Create guild in background
         GuildService guildService = GuildService.getInstance(requireContext());
         guildService.createGuild(guildName, description, maxMembers, new GuildService.GuildCallback() {
             @Override
             public void onSuccess(String message, Guild guild) {
-                requireActivity().runOnUiThread(() -> {
-                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
-                    
-                    // Send result to parent fragment
-                    Bundle result = new Bundle();
-                    result.putBoolean("guild_created", true);
-                    getParentFragmentManager().setFragmentResult("guild_created", result);
-                    
-                    dismiss();
-                });
+                if (getActivity() != null && isAdded()) {
+                    getActivity().runOnUiThread(() -> {
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+                            // Notify parent again after actual creation to force refresh
+                            Bundle result = new Bundle();
+                            result.putBoolean("guild_created", true);
+                            getParentFragmentManager().setFragmentResult("guild_created", result);
+                            dismiss();
+                        }
+                    });
+                }
             }
             
             @Override
             public void onError(String error) {
-                requireActivity().runOnUiThread(() -> {
-                    Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show();
-                });
+                if (getActivity() != null && isAdded()) {
+                    getActivity().runOnUiThread(() -> {
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(), error, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
             }
         });
     }
 }
+
 

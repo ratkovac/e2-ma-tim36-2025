@@ -10,8 +10,10 @@ import com.habitrpg.taskmanager.data.database.entities.GuildInvite;
 import com.habitrpg.taskmanager.data.database.entities.GuildMember;
 import com.habitrpg.taskmanager.data.database.entities.GuildMessage;
 import com.habitrpg.taskmanager.data.database.entities.User;
+import com.habitrpg.taskmanager.data.firebase.FirebaseManager;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -21,12 +23,14 @@ public class GuildRepository {
     private static GuildRepository instance;
     private final GuildDao guildDao;
     private final UserDao userDao;
+    private final FirebaseManager firebaseManager;
     private ExecutorService executor;
     
     private GuildRepository(Context context) {
         AppDatabase database = AppDatabase.getDatabase(context);
         this.guildDao = database.guildDao();
         this.userDao = database.userDao();
+        this.firebaseManager = FirebaseManager.getInstance();
         this.executor = Executors.newSingleThreadExecutor();
     }
     
@@ -69,6 +73,29 @@ public class GuildRepository {
                     leader != null ? leader.getEmail() : "", 
                     leader != null ? String.valueOf(leader.getAvatarId()) : "", true);
                 guildDao.insertGuildMember(leaderMember);
+                
+                // Sync guild with Firebase
+                firebaseManager.createGuildDocument(guildId, guildName, description, 
+                    leaderId, leaderUsername, maxMembers, 
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to sync guild to Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    });
+                
+                // Sync leader member with Firebase
+                firebaseManager.addGuildMemberDocument(memberId, guildId, leaderId,
+                    leader != null ? leader.getUsername() : leaderUsername,
+                    leader != null ? leader.getEmail() : "",
+                    leader != null ? leader.getAvatarId() : 0,
+                    true,
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to sync leader member to Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    });
                 
                 callback.onSuccess("Guild created successfully", guild);
             } catch (Exception e) {
@@ -141,14 +168,22 @@ public class GuildRepository {
                     return;
                 }
                 
-                // Deactivate guild
+                // Deactivate guild and remove related data
                 guildDao.deactivateGuild(guildId);
-                
-                // Remove all members
                 guildDao.deleteAllGuildMembers(guildId);
-                
-                // Delete all invites
                 guildDao.deleteAllGuildInvites(guildId);
+                guildDao.deleteAllGuildMessages(guildId);
+                // Hard delete guild row
+                guildDao.deleteGuild(guild);
+                
+                // Sync with Firebase
+                firebaseManager.disbandGuildDocument(guildId, 
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to disband guild in Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    });
                 
                 callback.onSuccess("Guild disbanded successfully", guild);
             } catch (Exception e) {
@@ -220,6 +255,15 @@ public class GuildRepository {
                 int newCount = guildDao.getGuildMemberCount(guild.getGuildId());
                 guildDao.updateGuildMemberCount(guild.getGuildId(), newCount);
                 
+                // Sync with Firebase
+                firebaseManager.removeGuildMemberDocument(member.getMemberId(), 
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to remove member from Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    });
+                
                 callback.onSuccess("Left guild successfully", guild);
             } catch (Exception e) {
                 callback.onError("Failed to leave guild: " + e.getMessage());
@@ -256,13 +300,41 @@ public class GuildRepository {
                 // Create invite
                 String inviteId = UUID.randomUUID().toString();
                 User fromUser = userDao.getUserById(fromUserId);
+                String fromUsername = fromUser != null ? fromUser.getUsername() : "";
                 GuildInvite invite = new GuildInvite(inviteId, guildId, guild.getGuildName(), 
-                    fromUserId, fromUser != null ? fromUser.getUsername() : "", toUserId, toUsername);
+                    fromUserId, fromUsername, toUserId, toUsername);
                 guildDao.insertGuildInvite(invite);
+                
+                // Sync with Firebase - THIS IS THE KEY FOR NOTIFICATIONS!
+                firebaseManager.sendGuildInviteDocument(inviteId, guildId, guild.getGuildName(),
+                    fromUserId, fromUsername, toUserId, toUsername,
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to sync invite to Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    });
                 
                 callback.onSuccess("Invite sent successfully", invite);
             } catch (Exception e) {
                 callback.onError("Failed to send invite: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void insertGuildInviteFromFirebase(GuildInvite invite, GuildInviteCallback callback) {
+        ensureExecutorActive();
+        executor.execute(() -> {
+            try {
+                GuildInvite existingInvite = guildDao.getGuildInviteById(invite.getInviteId());
+                if (existingInvite == null) {
+                    guildDao.insertGuildInvite(invite);
+                    callback.onSuccess("Invite saved from Firebase", invite);
+                } else {
+                    callback.onError("Invite already exists");
+                }
+            } catch (Exception e) {
+                callback.onError("Failed to save invite: " + e.getMessage());
             }
         });
     }
@@ -301,10 +373,56 @@ public class GuildRepository {
                 
                 Guild guild = guildDao.getGuildById(invite.getGuildId());
                 if (guild == null) {
-                    callback.onError("Guild not found");
+                    // Guild not in local DB, try to fetch from Firebase
+                    firebaseManager.getGuildDocument(invite.getGuildId(), new FirebaseManager.GuildListener() {
+                        @Override
+                        public void onGuildRetrieved(Map<String, Object> guildData) {
+                            // Move to background thread to insert into DB
+                            ensureExecutorActive();
+                            executor.execute(() -> {
+                                try {
+                                    // Create Guild object from Firebase data
+                                    Guild firebaseGuild = new Guild(
+                                        (String) guildData.get("guildId"),
+                                        (String) guildData.get("guildName"),
+                                        (String) guildData.get("description"),
+                                        (String) guildData.get("leaderId"),
+                                        (String) guildData.get("leaderUsername"),
+                                        ((Number) guildData.get("maxMembers")).intValue()
+                                    );
+                                    
+                                    // Insert guild into local DB
+                                    guildDao.insertGuild(firebaseGuild);
+                                    
+                                    // Continue with accept process
+                                    continueAcceptGuildInvite(inviteId, userId, firebaseGuild, invite, callback);
+                                } catch (Exception e) {
+                                    callback.onError("Failed to process guild from Firebase: " + e.getMessage());
+                                }
+                            });
+                        }
+                        
+                        @Override
+                        public void onError(String error) {
+                            callback.onError("Guild not found: " + error);
+                        }
+                    });
                     return;
                 }
                 
+                // Guild exists locally, continue with accept process
+                continueAcceptGuildInvite(inviteId, userId, guild, invite, callback);
+            } catch (Exception e) {
+                callback.onError("Failed to accept invite: " + e.getMessage());
+            }
+        });
+    }
+    
+    private void continueAcceptGuildInvite(String inviteId, String userId, Guild guild, 
+                                          GuildInvite invite, GuildCallback callback) {
+        ensureExecutorActive();
+        executor.execute(() -> {
+            try {
                 // Check if user is already in a guild
                 GuildMember existingMember = guildDao.getGuildMemberByUserId(userId);
                 if (existingMember != null) {
@@ -334,6 +452,28 @@ public class GuildRepository {
                 
                 // Update member count
                 guildDao.updateGuildMemberCount(guild.getGuildId(), currentMembers + 1);
+                
+                // Sync invite status with Firebase
+                firebaseManager.updateGuildInviteStatus(inviteId, "accepted", 
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to update invite status in Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    });
+                
+                // Sync new member with Firebase
+                firebaseManager.addGuildMemberDocument(memberId, guild.getGuildId(), userId,
+                    user != null ? user.getUsername() : invite.getToUsername(),
+                    user != null ? user.getEmail() : "",
+                    user != null ? user.getAvatarId() : 0,
+                    false,
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to sync member to Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    });
                 
                 callback.onSuccess("Joined guild successfully", guild);
             } catch (Exception e) {
@@ -365,11 +505,45 @@ public class GuildRepository {
                 // Update invite status
                 guildDao.updateInviteStatus(inviteId, "declined", System.currentTimeMillis());
                 
+                // Sync with Firebase
+                firebaseManager.updateGuildInviteStatus(inviteId, "declined", 
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to update invite status in Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    });
+                
                 callback.onSuccess("Invite declined", null);
             } catch (Exception e) {
                 callback.onError("Failed to decline invite: " + e.getMessage());
             }
         });
+    }
+    
+    public GuildMember getGuildMemberByIdSync(String memberId) {
+        try {
+            return guildDao.getGuildMemberById(memberId);
+        } catch (Exception e) {
+            android.util.Log.e("GuildRepository", "Error getting guild member by ID: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    public void insertGuildMemberSync(GuildMember member) {
+        try {
+            guildDao.insertGuildMember(member);
+        } catch (Exception e) {
+            android.util.Log.e("GuildRepository", "Error inserting guild member: " + e.getMessage());
+        }
+    }
+    
+    public void deactivateGuildMemberSync(String memberId) {
+        try {
+            guildDao.deactivateGuildMember(memberId);
+        } catch (Exception e) {
+            android.util.Log.e("GuildRepository", "Error deactivating guild member: " + e.getMessage());
+        }
     }
     
     // Callback interfaces
@@ -436,10 +610,27 @@ public class GuildRepository {
                 message.setUserId(userId);
                 message.setUsername(username);
                 message.setMessageText(messageText);
-                message.setTimestamp(System.currentTimeMillis());
+                long timestamp = System.currentTimeMillis();
+                message.setTimestamp(timestamp);
                 message.setSystemMessage(false);
                 
                 guildDao.insertGuildMessage(message);
+                
+                // Sync with Firebase
+                firebaseManager.sendGuildMessageDocument(
+                    message.getMessageId(),
+                    guildId,
+                    userId,
+                    username,
+                    messageText,
+                    timestamp,
+                    (success, exception) -> {
+                        if (!success) {
+                            System.out.println("Failed to sync message to Firebase: " + 
+                                (exception != null ? exception.getMessage() : "Unknown error"));
+                        }
+                    }
+                );
                 
                 // Return updated message list
                 List<GuildMessage> messages = guildDao.getGuildMessages(guildId);
@@ -448,6 +639,23 @@ public class GuildRepository {
                 callback.onError("Failed to send message: " + e.getMessage());
             }
         });
+    }
+    
+    public void insertGuildMessageSync(GuildMessage message) {
+        try {
+            guildDao.insertGuildMessage(message);
+        } catch (Exception e) {
+            android.util.Log.e("GuildRepository", "Error inserting guild message: " + e.getMessage());
+        }
+    }
+    
+    public GuildMessage getGuildMessageByIdSync(String messageId) {
+        try {
+            return guildDao.getGuildMessageById(messageId);
+        } catch (Exception e) {
+            android.util.Log.e("GuildRepository", "Error getting guild message by ID: " + e.getMessage());
+            return null;
+        }
     }
     
     public interface GuildMessageCallback {
