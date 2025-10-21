@@ -448,7 +448,12 @@ public class TaskCreationFragment extends Fragment {
                 
                 task.setRecurrenceInterval(interval);
                 task.setRecurrenceUnit(recurrenceUnitValues[binding.spinnerRecurrenceUnit.getSelectedItemPosition()]);
-                task.setStartDate(binding.btnStartDate.getText().toString());
+                // For recurring tasks, combine date and time like regular tasks
+                String recurringStartDate = binding.btnStartDate.getText().toString();
+                String recurringExecutionTime = binding.btnExecutionTime.getText().toString();
+                if (!recurringStartDate.equals("Select Date") && !recurringExecutionTime.equals("Select Time")) {
+                    task.setStartDate(recurringStartDate + " " + recurringExecutionTime);
+                }
                 task.setEndDate(binding.btnEndDate.getText().toString());
                 
             } catch (NumberFormatException e) {

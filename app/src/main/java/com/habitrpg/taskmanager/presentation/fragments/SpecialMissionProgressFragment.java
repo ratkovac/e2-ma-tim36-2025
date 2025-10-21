@@ -57,6 +57,18 @@ public class SpecialMissionProgressFragment extends Fragment {
 			public void onSuccess(SpecialMissionRepository.ProgressSummary s) {
 				if (!isAdded()) return;
 				requireActivity().runOnUiThread(() -> {
+					// Check if mission has expired
+					if (!s.hasActiveMission) {
+						tvShop.setText("Specijalna misija je završena");
+						tvRegularHits.setText("Rok je prošao");
+						tvEasyTasks.setText("");
+						tvOtherTasks.setText("");
+						tvNoUnresolved.setText("");
+						tvMessageDays.setText("");
+						tvTotal.setText("");
+						return;
+					}
+					
 					tvShop.setText("Kupovine: " + s.shopPurchases + "/5 (" + (s.hpFromShop) + " HP)");
 					tvRegularHits.setText("Boss udarci: " + s.regularBossHits + "/10 (" + (s.hpFromRegularHits) + " HP)");
 					tvEasyTasks.setText("Laki zadaci: " + s.easyTasksCompleted + "/10 (" + (s.hpFromEasyTasks) + " HP)");

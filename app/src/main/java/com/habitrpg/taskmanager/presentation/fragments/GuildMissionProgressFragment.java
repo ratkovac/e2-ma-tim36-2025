@@ -66,6 +66,31 @@ public class GuildMissionProgressFragment extends Fragment {
 			public void onSuccess(SpecialMissionRepository.GuildProgressSummary s) {
 				if (!isAdded()) return;
 				requireActivity().runOnUiThread(() -> {
+					// Check if mission has expired and finalize it
+					long now = System.currentTimeMillis();
+					if (now > s.endDate) {
+						// Mission expired - finalize it without rewards
+						SpecialMissionRepository.getInstance(getContext()).finalizeIfExpiredForGuild(guildId, new SpecialMissionRepository.FinalizeCallback() {
+							@Override
+							public void onCompleted(String msg) {
+								if (isAdded()) {
+									requireActivity().runOnUiThread(() -> {
+										tvBossHp.setText("Specijalna misija je završena");
+										tvTimeLeft.setText("Rok je prošao");
+										progressBar.setMax(1);
+										progressBar.setProgress(0);
+										rvMembers.setAdapter(null);
+									});
+								}
+							}
+							@Override
+							public void onNoAction() { /* no-op */ }
+							@Override
+							public void onError(String error) { /* no-op */ }
+						});
+						return;
+					}
+					
 					int max = Math.max(1, s.initialBossHp);
 					int current = Math.max(0, s.currentBossHp);
 					progressBar.setMax(max);

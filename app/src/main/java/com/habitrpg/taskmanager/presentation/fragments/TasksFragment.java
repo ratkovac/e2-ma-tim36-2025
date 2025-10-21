@@ -115,11 +115,6 @@ public class TasksFragment extends Fragment {
             // Navigate to calendar fragment
             Navigation.findNavController(v).navigate(R.id.navigation_calendar);
         });
-        
-        binding.btnBossFight.setOnClickListener(v -> {
-            // Navigate to boss fight fragment
-            Navigation.findNavController(v).navigate(R.id.navigation_boss_fight);
-        });
     }
 
     private void loadTasks() {

@@ -45,7 +45,8 @@ public class SpecialMission {
 		this.id = UUID.randomUUID().toString();
 		this.guildId = "";
 		this.startDate = System.currentTimeMillis();
-		long twoWeeksMs = 14L * 24L * 60L * 60L * 1000L;
+		// long twoWeeksMs = 14L * 24L * 60L * 60L * 1000L; // OVO JE PRAVA VREDNOST ZA 2 NEDELJE
+		long twoWeeksMs = 60L * 1000L; // 1 minut za testiranje
 		this.endDate = this.startDate + twoWeeksMs;
 		this.initialBossHP = 0;
 		this.currentBossHP = 0;

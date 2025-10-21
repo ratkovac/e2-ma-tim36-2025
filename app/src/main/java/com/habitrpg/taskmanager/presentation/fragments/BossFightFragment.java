@@ -337,7 +337,7 @@ public class BossFightFragment extends Fragment {
         successChanceText.setText(totalSuccessChance + "%" + (bonusSuccessChance > 0 ? " (+" + bonusSuccessChance + "%)" : ""));
 
         // Update equipment display with active equipment icons
-        updateEquipmentDisplay();
+        //updateEquipmentDisplay();
 
         // Update potential rewards display
         updatePotentialRewards();
@@ -418,6 +418,10 @@ public class BossFightFragment extends Fragment {
                                 LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) equipmentIcon.getLayoutParams();
                                 params.setMargins(0, 0, (int) (8 * getResources().getDisplayMetrics().density), 0);
                                 equipmentIcon.setLayoutParams(params);
+                                
+                                // Set background for better visibility
+                                equipmentIcon.setBackgroundResource(R.drawable.equipment_background);
+                                equipmentIcon.setPadding(4, 4, 4, 4);
                                 
                                 // Set icon based on icon resource name
                                 int iconResource = getIconResource(item.getIconResource());

@@ -149,7 +149,10 @@ public class SpecialMissionRepository {
 				int initialHp = 10 * Math.max(memberCount, 0);
 				//TREBA 100
 				long start = System.currentTimeMillis();
-				long end = start + 14L * 24L * 60L * 60L * 1000L;
+				// Da, end je 2 nedelje od pocetka:
+				// long end = start + 14L * 24L * 60L * 60L * 1000L;
+				// Za testiranje postavljamo end na 1 minut od starta:
+				long end = start + 60 * 1000;
 
 				SpecialMission mission = new SpecialMission(UUID.randomUUID().toString(), guildId, start, end, initialHp, initialHp, SpecialMission.STATUS_ACTIVE, false);
 				specialMissionDao.insert(mission);
