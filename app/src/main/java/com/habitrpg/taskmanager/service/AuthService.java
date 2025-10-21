@@ -45,7 +45,7 @@ public class AuthService {
                     if (firebaseUser != null) {
                         String userId = firebaseUser.getUid();
                         
-                        if (/*firebaseUser.isEmailVerified()*/true) {
+                        if (firebaseUser.isEmailVerified()) {
                             userPreferences.setLoggedIn(true);
                             userPreferences.setCurrentUserId(userId);
                             

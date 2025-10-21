@@ -383,6 +383,11 @@ public class GuildService {
             @Override
             public void onUserRetrieved(com.habitrpg.taskmanager.data.database.entities.User user) {
                 if (user != null) {
+                    // Show local echo notification so demo works on one device
+                    try {
+                        notificationService.showGuildMessageNotification(guildId, null, user.getUsername(), messageText);
+                    } catch (Exception ignored) {}
+                    
                     guildRepository.sendGuildMessage(guildId, currentUserId, user.getUsername(), messageText, new GuildRepository.GuildMessageCallback() {
                         @Override
                         public void onSuccess(String message, List<GuildMessage> messages) {
