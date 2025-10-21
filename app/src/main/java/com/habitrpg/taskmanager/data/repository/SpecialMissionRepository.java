@@ -146,8 +146,8 @@ public class SpecialMissionRepository {
 				}
 
 				int memberCount = guildDao.getGuildMemberCount(guildId);
-				int initialHp = 100 * Math.max(memberCount, 0);
-
+				int initialHp = 10 * Math.max(memberCount, 0);
+				//TREBA 100
 				long start = System.currentTimeMillis();
 				long end = start + 14L * 24L * 60L * 60L * 1000L;
 
@@ -216,6 +216,11 @@ public class SpecialMissionRepository {
 					guildDao.updateGuildMissionStatus(member.getGuildId(), false);
 				}
 				specialMissionDao.update(mission);
+				
+				// Proveri da li je boss poražen i dodeli nagrade NAKON ažuriranja
+				if (newHp == 0) {
+					checkBossDefeatAndAwardRewards(mission, userId, callback);
+				}
 
 				progress.setShopPurchases(progress.getShopPurchases() + 1);
 				progress.setTotalDamageDealt(progress.getTotalDamageDealt() + damage);
@@ -271,6 +276,11 @@ public class SpecialMissionRepository {
 					guildDao.updateGuildMissionStatus(member.getGuildId(), false);
 				}
 				specialMissionDao.update(mission);
+				
+				// Proveri da li je boss poražen i dodeli nagrade NAKON ažuriranja
+				if (newHp == 0) {
+					checkBossDefeatAndAwardRewards(mission, userId, callback);
+				}
 
 				progress.setRegularBossHits(progress.getRegularBossHits() + 1);
 				progress.setTotalDamageDealt(progress.getTotalDamageDealt() + damage);
@@ -345,6 +355,11 @@ public class SpecialMissionRepository {
 					guildDao.updateGuildMissionStatus(member.getGuildId(), false);
 				}
 				specialMissionDao.update(mission);
+				
+				// Proveri da li je boss poražen i dodeli nagrade NAKON ažuriranja
+				if (newHp == 0) {
+					checkBossDefeatAndAwardRewards(mission, userId, callback);
+				}
 
 				progress.setTotalDamageDealt(progress.getTotalDamageDealt() + totalDamage);
 				progressDao.insert(progress);
@@ -420,6 +435,11 @@ public class SpecialMissionRepository {
 					guildDao.updateGuildMissionStatus(member.getGuildId(), false);
 				}
 				specialMissionDao.update(mission);
+				
+				// Proveri da li je boss poražen i dodeli nagrade NAKON ažuriranja
+				if (newHp == 0) {
+					checkBossDefeatAndAwardRewards(mission, userId, callback);
+				}
 
 				progress.setHasNoUnresolvedTasks(true);
 				progress.setTotalDamageDealt(progress.getTotalDamageDealt() + damage);
@@ -481,6 +501,11 @@ public class SpecialMissionRepository {
 					guildDao.updateGuildMissionStatus(member.getGuildId(), false);
 				}
 				specialMissionDao.update(mission);
+				
+				// Proveri da li je boss poražen i dodeli nagrade NAKON ažuriranja
+				if (newHp == 0) {
+					checkBossDefeatAndAwardRewards(mission, userId, callback);
+				}
 
 				progress.setTotalDamageDealt(progress.getTotalDamageDealt() + damage);
 				progressDao.insert(progress);
@@ -627,6 +652,31 @@ public class SpecialMissionRepository {
 				callback.onError("Failed to finalize mission: " + e.getMessage());
 			}
 		});
+	}
+
+	private void checkBossDefeatAndAwardRewards(SpecialMission mission, String userId, ProgressUpdateCallback callback) {
+		try {
+			// Proveri da li je boss poražen koristeći prosleđeni mission objekat
+			if (mission != null && mission.getCurrentBossHP() <= 0 && mission.isSuccessful()) {
+				// Boss je poražen - dodeli nagrade svim članovima saveza
+				java.util.List<GuildMember> members = guildDao.getGuildMembersByGuildId(mission.getGuildId());
+				for (GuildMember member : members) {
+					grantPotionAndClothingSafe(member.getUserId());
+					grantHalfNextBossCoinsSafe(member.getUserId());
+					incrementUserStatsCompletedSafe(member.getUserId());
+				}
+				
+				// Prikaži Toast poruku korisniku koji je poslednji napao boss-a
+				android.util.Log.d("SpecialMission", "Boss defeated! Rewards awarded to all guild members");
+				
+				// Dodaj callback za Toast poruku
+				if (callback != null) {
+					callback.onUpdated("🎉 Boss poražen! Nagrade dodeljene svim članovima saveza!");
+				}
+			}
+		} catch (Exception e) {
+			android.util.Log.e("SpecialMission", "Error checking boss defeat: " + e.getMessage());
+		}
 	}
 
 	private void grantPotionAndClothingSafe(String userId) {
