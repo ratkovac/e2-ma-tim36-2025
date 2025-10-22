@@ -20,11 +20,13 @@ public class TaskService {
     private TaskRepository taskRepository;
     private UserRepository userRepository;
     private UserPreferences userPreferences;
+    private final com.habitrpg.taskmanager.data.repository.SpecialMissionRepository specialMissionRepository;
 
     private TaskService(Context context) {
         taskRepository = TaskRepository.getInstance(context);
         userRepository = UserRepository.getInstance(context);
         userPreferences = UserPreferences.getInstance(context);
+        this.specialMissionRepository = com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.getInstance(context);
     }
     
     public static synchronized TaskService getInstance(Context context) {
@@ -47,14 +49,8 @@ public class TaskService {
             task.setStartDate(DateUtils.getCurrentDateTimeString());
         }
         
-        validateTaskQuota(task, isValid -> {
-            if (!isValid) {
-                callback.onError("Task quota limit exceeded for this difficulty/importance combination");
-                return;
-            }
-            
-            // Get user level for XP calculation
-            userRepository.getUserById(userId, new UserRepository.UserCallback() {
+        // Get user level for XP calculation
+        userRepository.getUserById(userId, new UserRepository.UserCallback() {
                 @Override
                 public void onSuccess(String message) {}
                 
@@ -80,7 +76,6 @@ public class TaskService {
                     }
                 }
             });
-        });
     }
     
     private void createSingleTask(Task task, TaskCallback callback) {
@@ -239,32 +234,62 @@ public class TaskService {
                     return;
                 }
                 
-                taskRepository.updateTaskStatus(taskId, "completed", new TaskRepository.TaskCallback() {
+                // Proverava kvote pre završavanja zadatka
+                validateTaskQuota(task, new QuotaValidationCallback() {
                     @Override
-                    public void onSuccess(String message) {
-                        String currentDate = DateUtils.getCurrentDateString();
-                        TaskCompletion completion = new TaskCompletion(taskId, currentDate, task.getXpValue());
+                    public void onValidationResult(boolean isValid) {
+                        if (!isValid) {
+                            callback.onError("Cannot complete task - quota limit reached for this difficulty/importance combination");
+                            return;
+                        }
                         
-                        taskRepository.insertTaskCompletion(completion, new TaskRepository.TaskCallback() {
+                        // Kvota je u redu, nastavi sa završavanjem zadatka
+                        taskRepository.updateTaskStatus(taskId, "completed", new TaskRepository.TaskCallback() {
                             @Override
                             public void onSuccess(String message) {
-                                updateUserXP(task, callback);
-                            }
-                            
-                            @Override
-                            public void onError(String error) {
-                                callback.onError("Failed to record completion: " + error);
-                            }
-                            
-                            @Override
-                            public void onTaskRetrieved(Task task) {}
-                            
-                            @Override
-                            public void onTasksRetrieved(List<Task> tasks) {}
-                            
-                            @Override
-                            public void onTaskCountRetrieved(int count) {}
-                        });
+                                String currentDate = DateUtils.getCurrentDateString();
+                                TaskCompletion completion = new TaskCompletion(taskId, currentDate, task.getXpValue());
+                                
+                                taskRepository.insertTaskCompletion(completion, new TaskRepository.TaskCallback() {
+                                    @Override
+                                    public void onSuccess(String message) {
+                                        // Update special mission progress for task completion (non-blocking)
+                                        String difficulty = task.getDifficulty();
+                                        String importance = task.getImportance();
+                                        specialMissionRepository.recordTaskCompletion(userId, difficulty, importance,
+                                            new com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.ProgressUpdateCallback() {
+                                                @Override public void onUpdated(String msg) { /* no-op */ }
+                                                @Override public void onNoActiveMission() { /* no-op */ }
+                                                @Override public void onError(String error) { /* no-op */ }
+                                            }
+                                        );
+                                        
+                                        updateUserXP(task, callback);
+
+                                        // Periodically check and apply no-unresolved-tasks bonus
+                                        specialMissionRepository.checkAndApplyNoUnresolvedTasksBonus(userId,
+                                            new com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.ProgressUpdateCallback() {
+                                                @Override public void onUpdated(String msg) { /* no-op */ }
+                                                @Override public void onNoActiveMission() { /* no-op */ }
+                                                @Override public void onError(String error) { /* no-op */ }
+                                            }
+                                        );
+                                    }
+                                    
+                                    @Override
+                                    public void onError(String error) {
+                                        callback.onError("Failed to record completion: " + error);
+                                    }
+                                    
+                                    @Override
+                                    public void onTaskRetrieved(Task task) {}
+                                    
+                                    @Override
+                                    public void onTasksRetrieved(List<Task> tasks) {}
+                                    
+                                    @Override
+                                    public void onTaskCountRetrieved(int count) {}
+                                });
                     }
                     
                     @Override
@@ -280,6 +305,9 @@ public class TaskService {
                     
                     @Override
                     public void onTaskCountRetrieved(int count) {}
+                });
+                    }
+
                 });
             }
             
@@ -303,6 +331,117 @@ public class TaskService {
             callback.onSuccess("Task status updated (no XP awarded for " + task.getStatus() + " tasks)");
             return;
         }
+        
+        // Kvota se sada proverava pre završavanja zadatka, tako da ovde direktno dodeljujemo XP
+        awardXPToUser(task, callback);
+    }
+    
+    private void checkTaskQuotaForXP(Task task, QuotaValidationCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        String difficulty = task.getDifficulty();
+        String importance = task.getImportance();
+        
+        // Get all completed tasks for this user
+        taskRepository.getAllTasks(userId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onValidationResult(false);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> allTasks) {
+                if (allTasks == null) {
+                    callback.onValidationResult(true);
+                    return;
+                }
+                
+                // Count completed tasks with same difficulty and importance
+                int completedCount = 0;
+                String currentDate = DateUtils.getCurrentDateString();
+                String[] currentWeekDates = DateUtils.getCurrentWeekDates();
+                String[] currentMonthDates = DateUtils.getCurrentMonthDates();
+                
+                for (Task t : allTasks) {
+                    if (!"completed".equals(t.getStatus())) {
+                        continue; // Skip non-completed tasks
+                    }
+                    
+                    if (!t.getUserId().equals(userId)) {
+                        continue; // Skip tasks from other users
+                    }
+                    
+                    // Check if this completed task matches the current task's difficulty/importance
+                    boolean matchesDifficulty = t.getDifficulty().equals(difficulty);
+                    boolean matchesImportance = t.getImportance().equals(importance);
+                    
+                    if (matchesDifficulty && matchesImportance) {
+                        // Check if it's within the time period for quota
+                        String taskDate = t.getStartDate();
+                        if (taskDate != null && !taskDate.isEmpty()) {
+                            String taskDateOnly = taskDate.split(" ")[0]; // Extract date part
+                            
+                            if ("very_easy".equals(difficulty) && "normal".equals(importance)) {
+                                // Daily limit: 5
+                                if (taskDateOnly.equals(currentDate)) {
+                                    completedCount++;
+                                }
+                            } else if ("easy".equals(difficulty) && "important".equals(importance)) {
+                                // Daily limit: 5
+                                if (taskDateOnly.equals(currentDate)) {
+                                    completedCount++;
+                                }
+                            } else if ("hard".equals(difficulty) && "very_important".equals(importance)) {
+                                // Daily limit: 2
+                                if (taskDateOnly.equals(currentDate)) {
+                                    completedCount++;
+                                }
+                            } else if ("extreme".equals(difficulty)) {
+                                // Weekly limit: 1
+                                if (taskDateOnly.compareTo(currentWeekDates[0]) >= 0 && 
+                                    taskDateOnly.compareTo(currentWeekDates[1]) <= 0) {
+                                    completedCount++;
+                                }
+                            } else if ("special".equals(importance)) {
+                                // Monthly limit: 1
+                                if (taskDateOnly.compareTo(currentMonthDates[0]) >= 0 && 
+                                    taskDateOnly.compareTo(currentMonthDates[1]) <= 0) {
+                                    completedCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Check if quota is exceeded
+                boolean quotaExceeded = false;
+                if ("very_easy".equals(difficulty) && "normal".equals(importance) && completedCount >= 5) {
+                    quotaExceeded = true;
+                } else if ("easy".equals(difficulty) && "important".equals(importance) && completedCount >= 5) {
+                    quotaExceeded = true;
+                } else if ("hard".equals(difficulty) && "very_important".equals(importance) && completedCount >= 2) {
+                    quotaExceeded = true;
+                } else if ("extreme".equals(difficulty) && completedCount >= 1) {
+                    quotaExceeded = true;
+                } else if ("special".equals(importance) && completedCount >= 1) {
+                    quotaExceeded = true;
+                }
+                
+                callback.onValidationResult(!quotaExceeded);
+            }
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private void awardXPToUser(Task task, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
         
         userRepository.getUserById(userId, new UserRepository.UserCallback() {
             @Override
@@ -425,6 +564,41 @@ public class TaskService {
             return;
         }
         
+        // First get the original task from database to check if it's recurring
+        taskRepository.getTaskById(task.getId(), new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to get task: " + error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task originalTask) {
+                if (originalTask == null) {
+                    callback.onError("Task not found");
+                    return;
+                }
+                
+                // Check if this is a recurring task and validate edit permissions
+                if (originalTask.isRecurring()) {
+                    validateRecurringTaskEdit(originalTask, task, callback);
+                } else {
+                    // Proceed with update directly for non-recurring tasks
+                    performTaskUpdate(task, callback);
+                }
+            }
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private void performTaskUpdate(Task task, TaskCallback callback) {
         int xpValue = XPService.calculateTaskXP(task.getDifficulty(), task.getImportance());
         task.setXpValue(xpValue);
         
@@ -448,6 +622,226 @@ public class TaskService {
             @Override
             public void onTaskCountRetrieved(int count) {}
         });
+    }
+    
+    private void validateRecurringTaskEdit(Task originalTask, Task updatedTask, TaskCallback callback) {
+        // Check if the original task's start_date is in the future
+        if (originalTask.getStartDate() == null || originalTask.getStartDate().isEmpty()) {
+            callback.onError("Recurring task must have a start date");
+            return;
+        }
+        
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+            java.util.Date taskDateTime = sdf.parse(originalTask.getStartDate());
+            java.util.Date currentDateTime = sdf.parse(DateUtils.getCurrentDateTimeString());
+            
+            // Only allow editing if start_date is in the future
+            if (taskDateTime.compareTo(currentDateTime) <= 0) {
+                callback.onError("Only future recurring tasks can be edited");
+                return;
+            }
+            
+            // Validate that only name and description can be changed
+            if (!isRecurringTaskEditValid(originalTask, updatedTask)) {
+                callback.onError("For recurring tasks, only name and description can be modified");
+                return;
+            }
+            
+            // If validation passes, update the current task and all future instances
+            updateRecurringTaskAndFutureInstances(originalTask, updatedTask, callback);
+            
+        } catch (Exception e) {
+            callback.onError("Invalid date format: " + e.getMessage());
+        }
+    }
+    
+    private boolean isRecurringTaskEditValid(Task originalTask, Task updatedTask) {
+        // Only allow changes to name and description
+        boolean nameChanged = !originalTask.getName().equals(updatedTask.getName());
+        boolean descriptionChanged = !java.util.Objects.equals(originalTask.getDescription(), updatedTask.getDescription());
+        
+        // Check if any other fields were changed
+        boolean categoryChanged = originalTask.getCategoryId() != updatedTask.getCategoryId();
+        boolean difficultyChanged = !originalTask.getDifficulty().equals(updatedTask.getDifficulty());
+        boolean importanceChanged = !originalTask.getImportance().equals(updatedTask.getImportance());
+        boolean recurringChanged = originalTask.isRecurring() != updatedTask.isRecurring();
+        boolean recurrenceIntervalChanged = originalTask.getRecurrenceInterval() != updatedTask.getRecurrenceInterval();
+        boolean recurrenceUnitChanged = !java.util.Objects.equals(originalTask.getRecurrenceUnit(), updatedTask.getRecurrenceUnit());
+        boolean startDateChanged = !java.util.Objects.equals(originalTask.getStartDate(), updatedTask.getStartDate());
+        boolean endDateChanged = !java.util.Objects.equals(originalTask.getEndDate(), updatedTask.getEndDate());
+        boolean statusChanged = !originalTask.getStatus().equals(updatedTask.getStatus());
+        
+        // Only name and description changes are allowed
+        return !categoryChanged && !difficultyChanged && !importanceChanged && 
+               !recurringChanged && !recurrenceIntervalChanged && !recurrenceUnitChanged && 
+               !startDateChanged && !endDateChanged && !statusChanged &&
+               (nameChanged || descriptionChanged);
+    }
+    
+    private void updateRecurringTaskAndFutureInstances(Task originalTask, Task updatedTask, TaskCallback callback) {
+        // Create a task with only the allowed changes (name and description)
+        Task taskToUpdate = new Task();
+        taskToUpdate.setId(originalTask.getId());
+        taskToUpdate.setUserId(originalTask.getUserId());
+        taskToUpdate.setCategoryId(originalTask.getCategoryId());
+        taskToUpdate.setName(updatedTask.getName()); // Allow name change
+        taskToUpdate.setDescription(updatedTask.getDescription()); // Allow description change
+        taskToUpdate.setDifficulty(originalTask.getDifficulty()); // Keep original
+        taskToUpdate.setImportance(originalTask.getImportance()); // Keep original
+        taskToUpdate.setXpValue(originalTask.getXpValue()); // Keep original
+        taskToUpdate.setRecurring(originalTask.isRecurring()); // Keep original
+        taskToUpdate.setRecurrenceInterval(originalTask.getRecurrenceInterval()); // Keep original
+        taskToUpdate.setRecurrenceUnit(originalTask.getRecurrenceUnit()); // Keep original
+        taskToUpdate.setStartDate(originalTask.getStartDate()); // Keep original
+        taskToUpdate.setEndDate(originalTask.getEndDate()); // Keep original
+        taskToUpdate.setStatus(originalTask.getStatus()); // Keep original
+        
+        // First update the current task
+        taskRepository.updateTask(taskToUpdate, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {
+                // Now find and update all future instances
+                findAndUpdateFutureRecurringInstances(originalTask, updatedTask, callback);
+            }
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to update recurring task: " + error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private void findAndUpdateFutureRecurringInstances(Task originalTask, Task updatedTask, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        
+        // Get all tasks for the user
+        taskRepository.getAllTasks(userId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to get tasks for update: " + error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> allTasks) {
+                if (allTasks == null) {
+                    callback.onSuccess("Recurring task and future instances updated successfully");
+                    return;
+                }
+                
+                // Find all future instances of the recurring task
+                List<Task> tasksToUpdate = new java.util.ArrayList<>();
+                String currentDate = DateUtils.getCurrentDateString();
+                
+                // Extract base task name (without date in parentheses)
+                String baseTaskName = extractBaseTaskName(originalTask.getName());
+                
+                for (Task task : allTasks) {
+                    // Check if it's a recurring task
+                    if (!task.isRecurring()) {
+                        continue;
+                    }
+                    
+                    // Check if it has the same base name
+                    String taskBaseName = extractBaseTaskName(task.getName());
+                    if (!baseTaskName.equals(taskBaseName)) {
+                        continue;
+                    }
+                    
+                    // Check if it's a future task (not completed)
+                    if ("completed".equals(task.getStatus())) {
+                        continue; // Don't update completed tasks
+                    }
+                    
+                    // Check if the date is in the future or today
+                    if (task.getStartDate() != null && !task.getStartDate().isEmpty()) {
+                        String taskDate = task.getStartDate().split(" ")[0]; // Get only date part
+                        if (taskDate.compareTo(currentDate) >= 0) {
+                            tasksToUpdate.add(task);
+                        }
+                    }
+                }
+                
+                // Update all found future instances
+                updateTasksInBatch(tasksToUpdate, originalTask, updatedTask, callback);
+            }
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private void updateTasksInBatch(List<Task> tasksToUpdate, Task originalTask, Task updatedTask, TaskCallback callback) {
+        if (tasksToUpdate.isEmpty()) {
+            callback.onSuccess("Recurring task and future instances updated successfully");
+            return;
+        }
+        
+        final int[] updatedCount = {0};
+        final int totalTasks = tasksToUpdate.size();
+        
+        for (Task task : tasksToUpdate) {
+            // Create a copy with only the allowed changes (name and description)
+            Task updatedTaskInstance = new Task();
+            updatedTaskInstance.setId(task.getId());
+            updatedTaskInstance.setUserId(task.getUserId());
+            updatedTaskInstance.setCategoryId(originalTask.getCategoryId());
+            
+            // Update name with new base name but keep the date part
+            String newBaseName = extractBaseTaskName(updatedTask.getName());
+            String taskDate = task.getStartDate().split(" ")[0];
+            updatedTaskInstance.setName(newBaseName + " (" + taskDate + ")");
+            
+            updatedTaskInstance.setDescription(updatedTask.getDescription()); // Allow description change
+            updatedTaskInstance.setDifficulty(originalTask.getDifficulty()); // Keep original
+            updatedTaskInstance.setImportance(originalTask.getImportance()); // Keep original
+            updatedTaskInstance.setXpValue(originalTask.getXpValue()); // Keep original
+            updatedTaskInstance.setRecurring(true);
+            updatedTaskInstance.setRecurrenceInterval(originalTask.getRecurrenceInterval());
+            updatedTaskInstance.setRecurrenceUnit(originalTask.getRecurrenceUnit());
+            updatedTaskInstance.setStartDate(task.getStartDate()); // Keep the original date
+            updatedTaskInstance.setEndDate(originalTask.getEndDate());
+            updatedTaskInstance.setStatus(task.getStatus()); // Keep the original status
+            
+            taskRepository.updateTask(updatedTaskInstance, new TaskRepository.TaskCallback() {
+                @Override
+                public void onSuccess(String message) {
+                    updatedCount[0]++;
+                    if (updatedCount[0] == totalTasks) {
+                        callback.onSuccess("Recurring task and " + totalTasks + " future instances updated successfully");
+                    }
+                }
+                
+                @Override
+                public void onError(String error) {
+                    callback.onError("Failed to update some recurring task instances: " + error);
+                }
+                
+                @Override
+                public void onTaskRetrieved(Task task) {}
+                
+                @Override
+                public void onTasksRetrieved(List<Task> tasks) {}
+                
+                @Override
+                public void onTaskCountRetrieved(int count) {}
+            });
+        }
     }
     
     public void cancelTask(int taskId, TaskCallback callback) {
@@ -673,9 +1067,61 @@ public class TaskService {
             public void onTaskCountRetrieved(int count) {}
         });
     }
+
+    public void getAllTasksIncludingIncomplete(TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        if (userId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+
+        taskRepository.getAllTasksByUserId(userId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+
+            @Override
+            public void onTaskRetrieved(Task task) {}
+
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {
+                callback.onTasksRetrieved(tasks);
+            }
+
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
     
     public void getTaskCountByDifficultyAndImportanceForDate(String userId, String difficulty, String importance, String date, TaskCountCallback callback) {
-        taskRepository.getTaskCountByDifficultyAndImportanceForDate(userId, difficulty, importance, date, new TaskRepository.TaskCallback() {
+        taskRepository.getCompletedTaskCountByDifficultyAndImportanceForDate(userId, difficulty, importance, date, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {
+                callback.onTaskCountRetrieved(count);
+            }
+        });
+    }
+    
+    public void getCompletedTaskCountByDifficultyAndImportanceForDate(String userId, String difficulty, String importance, String date, TaskCountCallback callback) {
+        taskRepository.getCompletedTaskCountByDifficultyAndImportanceForDate(userId, difficulty, importance, date, new TaskRepository.TaskCallback() {
             @Override
             public void onSuccess(String message) {}
             
@@ -698,7 +1144,30 @@ public class TaskService {
     }
     
     public void getExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd, TaskCountCallback callback) {
-        taskRepository.getExtremeTaskCountForWeek(userId, weekStart, weekEnd, new TaskRepository.TaskCallback() {
+        taskRepository.getCompletedExtremeTaskCountForWeek(userId, weekStart, weekEnd, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {
+                callback.onTaskCountRetrieved(count);
+            }
+        });
+    }
+    
+    public void getCompletedExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd, TaskCountCallback callback) {
+        taskRepository.getCompletedExtremeTaskCountForWeek(userId, weekStart, weekEnd, new TaskRepository.TaskCallback() {
             @Override
             public void onSuccess(String message) {}
             
@@ -721,7 +1190,30 @@ public class TaskService {
     }
     
     public void getSpecialTaskCountForMonth(String userId, String monthStart, String monthEnd, TaskCountCallback callback) {
-        taskRepository.getSpecialTaskCountForMonth(userId, monthStart, monthEnd, new TaskRepository.TaskCallback() {
+        taskRepository.getCompletedSpecialTaskCountForMonth(userId, monthStart, monthEnd, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {
+                callback.onTaskCountRetrieved(count);
+            }
+        });
+    }
+    
+    public void getCompletedSpecialTaskCountForMonth(String userId, String monthStart, String monthEnd, TaskCountCallback callback) {
+        taskRepository.getCompletedSpecialTaskCountForMonth(userId, monthStart, monthEnd, new TaskRepository.TaskCallback() {
             @Override
             public void onSuccess(String message) {}
             
@@ -792,7 +1284,7 @@ public class TaskService {
             getExtremeTaskCountForWeek(userId, weekDates[0], weekDates[1], new TaskCountCallback() {
                 @Override
                 public void onTaskCountRetrieved(int weeklyCount) {
-                    if (weeklyCount >= 1) {
+                    if (weeklyCount >= 5 /*treba  1*/) {
                         callback.onValidationResult(false);
                         return;
                     }
@@ -818,7 +1310,7 @@ public class TaskService {
             getSpecialTaskCountForMonth(userId, monthDates[0], monthDates[1], new TaskCountCallback() {
                 @Override
                 public void onTaskCountRetrieved(int monthlyCount) {
-                    if (monthlyCount >= 1) {
+                    if (monthlyCount >= 5 /*treba 1*/) {
                         callback.onValidationResult(false);
                         return;
                     }
@@ -928,27 +1420,32 @@ public class TaskService {
                     return;
                 }
                 
-                // Briši zadatak (bilo da je ponavljajući ili obični)
-                taskRepository.deleteTask(taskId, new TaskRepository.TaskCallback() {
-                    @Override
-                    public void onSuccess(String message) {
-                        callback.onSuccess("Task deleted successfully");
-                    }
-                    
-                    @Override
-                    public void onError(String error) {
-                        callback.onError(error);
-                    }
-                    
-                    @Override
-                    public void onTaskRetrieved(Task task) {}
-                    
-                    @Override
-                    public void onTasksRetrieved(List<Task> tasks) {}
-                    
-                    @Override
-                    public void onTaskCountRetrieved(int count) {}
-                });
+                // Proveri da li je ponavljajući zadatak
+                if (task.isRecurring()) {
+                    deleteRecurringTaskAndFutureInstances(task, callback);
+                } else {
+                    // Briši obični zadatak
+                    taskRepository.deleteTask(taskId, new TaskRepository.TaskCallback() {
+                        @Override
+                        public void onSuccess(String message) {
+                            callback.onSuccess("Task deleted successfully");
+                        }
+                        
+                        @Override
+                        public void onError(String error) {
+                            callback.onError(error);
+                        }
+                        
+                        @Override
+                        public void onTaskRetrieved(Task task) {}
+                        
+                        @Override
+                        public void onTasksRetrieved(List<Task> tasks) {}
+                        
+                        @Override
+                        public void onTaskCountRetrieved(int count) {}
+                    });
+                }
             }
             
             @Override
@@ -957,6 +1454,146 @@ public class TaskService {
             @Override
             public void onTaskCountRetrieved(int count) {}
         });
+    }
+    
+    private void deleteRecurringTaskAndFutureInstances(Task task, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        
+        // Prvo obriši trenutni zadatak
+        taskRepository.deleteTask(task.getId(), new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {
+                // Sada pronađi i obriši sve buduće instance
+                findAndDeleteFutureRecurringInstances(task, callback);
+            }
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to delete recurring task: " + error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> tasks) {}
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private void findAndDeleteFutureRecurringInstances(Task originalTask, TaskCallback callback) {
+        String userId = userPreferences.getCurrentUserId();
+        
+        // Uzmi sve zadatke korisnika
+        taskRepository.getAllTasks(userId, new TaskRepository.TaskCallback() {
+            @Override
+            public void onSuccess(String message) {}
+            
+            @Override
+            public void onError(String error) {
+                callback.onError("Failed to get tasks for deletion: " + error);
+            }
+            
+            @Override
+            public void onTaskRetrieved(Task task) {}
+            
+            @Override
+            public void onTasksRetrieved(List<Task> allTasks) {
+                if (allTasks == null) {
+                    callback.onSuccess("Recurring task and future instances deleted successfully");
+                    return;
+                }
+                
+                // Pronađi sve buduće instance ponavljajućeg zadatka
+                List<Task> tasksToDelete = new java.util.ArrayList<>();
+                String currentDate = DateUtils.getCurrentDateString();
+                
+                // Izvuci osnovni naziv zadatka (bez datuma u zagradama)
+                String baseTaskName = extractBaseTaskName(originalTask.getName());
+                
+                for (Task task : allTasks) {
+                    // Proveri da li je ponavljajući zadatak
+                    if (!task.isRecurring()) {
+                        continue;
+                    }
+                    
+                    // Proveri da li ima isti osnovni naziv
+                    String taskBaseName = extractBaseTaskName(task.getName());
+                    if (!baseTaskName.equals(taskBaseName)) {
+                        continue;
+                    }
+                    
+                    // Proveri da li je budući zadatak (ne završen)
+                    if ("completed".equals(task.getStatus())) {
+                        continue; // Ne briši završene zadatke
+                    }
+                    
+                    // Proveri da li je datum u budućnosti ili danas
+                    if (task.getStartDate() != null && !task.getStartDate().isEmpty()) {
+                        String taskDate = task.getStartDate().split(" ")[0]; // Uzmi samo datum
+                        if (taskDate.compareTo(currentDate) >= 0) {
+                            tasksToDelete.add(task);
+                        }
+                    }
+                }
+                
+                // Obriši sve pronađene buduće instance
+                deleteTasksInBatch(tasksToDelete, callback);
+            }
+            
+            @Override
+            public void onTaskCountRetrieved(int count) {}
+        });
+    }
+    
+    private String extractBaseTaskName(String taskName) {
+        // Ukloni datum u zagradama sa kraja naziva
+        // Primer: "Trčanje (2025-01-15)" -> "Trčanje"
+        if (taskName != null && taskName.contains(" (")) {
+            int lastParenIndex = taskName.lastIndexOf(" (");
+            if (lastParenIndex > 0) {
+                return taskName.substring(0, lastParenIndex).trim();
+            }
+        }
+        return taskName;
+    }
+    
+    private void deleteTasksInBatch(List<Task> tasksToDelete, TaskCallback callback) {
+        if (tasksToDelete.isEmpty()) {
+            callback.onSuccess("Recurring task and future instances deleted successfully");
+            return;
+        }
+        
+        final int[] deletedCount = {0};
+        final int totalTasks = tasksToDelete.size();
+        
+        for (Task task : tasksToDelete) {
+            taskRepository.deleteTask(task.getId(), new TaskRepository.TaskCallback() {
+                @Override
+                public void onSuccess(String message) {
+                    deletedCount[0]++;
+                    if (deletedCount[0] == totalTasks) {
+                        callback.onSuccess("Recurring task and " + totalTasks + " future instances deleted successfully");
+                    }
+                }
+                
+                @Override
+                public void onError(String error) {
+                    callback.onError("Failed to delete some recurring task instances: " + error);
+                }
+                
+                @Override
+                public void onTaskRetrieved(Task task) {}
+                
+                @Override
+                public void onTasksRetrieved(List<Task> tasks) {}
+                
+                @Override
+                public void onTaskCountRetrieved(int count) {}
+            });
+        }
     }
     
     public String getCurrentUserId() {

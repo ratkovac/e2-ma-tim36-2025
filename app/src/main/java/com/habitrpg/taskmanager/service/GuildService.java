@@ -8,6 +8,8 @@ import com.habitrpg.taskmanager.data.database.entities.GuildMember;
 import com.habitrpg.taskmanager.data.database.entities.GuildMessage;
 import com.habitrpg.taskmanager.data.repository.GuildRepository;
 import com.habitrpg.taskmanager.data.repository.UserRepository;
+import com.habitrpg.taskmanager.data.repository.SpecialMissionRepository;
+import com.habitrpg.taskmanager.data.database.entities.SpecialMission;
 import com.habitrpg.taskmanager.service.UserPreferences;
 
 import java.util.List;
@@ -19,12 +21,38 @@ public class GuildService {
     private final UserRepository userRepository;
     private final UserPreferences userPreferences;
     private final NotificationService notificationService;
+    private final SpecialMissionRepository specialMissionRepository;
     
     private GuildService(Context context) {
         this.guildRepository = GuildRepository.getInstance(context);
         this.userRepository = UserRepository.getInstance(context);
         this.userPreferences = UserPreferences.getInstance(context);
         this.notificationService = NotificationService.getInstance(context);
+        this.specialMissionRepository = SpecialMissionRepository.getInstance(context);
+    }
+    public void startSpecialMission(String guildId, GuildMissionCallback callback) {
+        String currentUserId = userPreferences.getCurrentUserId();
+        if (currentUserId == null) {
+            callback.onError("User not logged in");
+            return;
+        }
+
+        specialMissionRepository.startMissionForGuild(guildId, currentUserId, new SpecialMissionRepository.StartMissionCallback() {
+            @Override
+            public void onSuccess(String message, SpecialMission mission) {
+                callback.onSuccess(message, mission);
+            }
+
+            @Override
+            public void onError(String error) {
+                callback.onError(error);
+            }
+        });
+    }
+
+    public interface GuildMissionCallback {
+        void onSuccess(String message, SpecialMission mission);
+        void onError(String error);
     }
     
     public static synchronized GuildService getInstance(Context context) {
@@ -339,6 +367,14 @@ public class GuildService {
         guildRepository.getCurrentGuild(currentUserId, new GuildRepository.GuildCallback() {
             @Override
             public void onSuccess(String message, Guild guild) {
+                // Attempt to finalize expired mission for this guild (non-blocking)
+                if (guild != null) {
+                    specialMissionRepository.finalizeIfExpiredForGuild(guild.getGuildId(), new SpecialMissionRepository.FinalizeCallback() {
+                        @Override public void onCompleted(String msg) { /* no-op */ }
+                        @Override public void onNoAction() { /* no-op */ }
+                        @Override public void onError(String error) { /* no-op */ }
+                    });
+                }
                 callback.onSuccess(message, guild);
             }
             
@@ -391,6 +427,12 @@ public class GuildService {
                     guildRepository.sendGuildMessage(guildId, currentUserId, user.getUsername(), messageText, new GuildRepository.GuildMessageCallback() {
                         @Override
                         public void onSuccess(String message, List<GuildMessage> messages) {
+                            // After success, record special mission message-day progress
+                            specialMissionRepository.recordGuildMessageDay(currentUserId, new SpecialMissionRepository.ProgressUpdateCallback() {
+                                @Override public void onUpdated(String msg) { /* no-op */ }
+                                @Override public void onNoActiveMission() { /* no-op */ }
+                                @Override public void onError(String error) { /* no-op */ }
+                            });
                             callback.onSuccess(message, messages);
                         }
                         

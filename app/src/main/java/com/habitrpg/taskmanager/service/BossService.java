@@ -23,13 +23,14 @@ public class BossService {
     private final AppDatabase database;
     private final UserRepository userRepository;
     private final UserPreferences userPreferences;
+    private final com.habitrpg.taskmanager.data.repository.SpecialMissionRepository specialMissionRepository;
     
     // Boss fight constants
     private static final int FIRST_BOSS_HP = 200;
     private static final int MAX_ATTACKS = 5;
     private static final int BASE_COIN_REWARD = 200;
     private static final double COIN_INCREASE_RATE = 0.20; // 20% increase
-    private static final double EQUIPMENT_DROP_CHANCE = 1.0; // 100% chance - always drop equipment
+    private static final double EQUIPMENT_DROP_CHANCE = 0.20; // 20% chance - reduced from 100%
     private static final double CLOTHING_DROP_CHANCE = 0.50; // 50% of equipment drops
     private static final double WEAPON_DROP_CHANCE = 0.50; // 50% of equipment drops
     private static final double PARTIAL_VICTORY_THRESHOLD = 0.50; // 50% HP damage for partial victory
@@ -38,6 +39,7 @@ public class BossService {
         database = AppDatabase.getDatabase(context);
         userRepository = UserRepository.getInstance(context);
         userPreferences = UserPreferences.getInstance(context);
+        specialMissionRepository = com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.getInstance(context);
     }
     
     public static synchronized BossService getInstance(Context context) {
@@ -461,6 +463,19 @@ public class BossService {
                     if (attackHits) {
                         boss.takeDamage(playerPp);
                         database.bossDao().updateBoss(boss);
+
+                        // Inform special mission progress about a successful regular boss hit
+                        String currentUserId = userPreferences.getCurrentUserId();
+                        if (currentUserId != null) {
+                            specialMissionRepository.recordRegularBossHit(currentUserId, new com.habitrpg.taskmanager.data.repository.SpecialMissionRepository.ProgressUpdateCallback() {
+                                @Override
+                                public void onUpdated(String message) { /* no-op */ }
+                                @Override
+                                public void onNoActiveMission() { /* no-op */ }
+                                @Override
+                                public void onError(String error) { /* no-op */ }
+                            });
+                        }
                         
                         if (boss.isDefeated()) {
                             // Boss defeated - calculate rewards

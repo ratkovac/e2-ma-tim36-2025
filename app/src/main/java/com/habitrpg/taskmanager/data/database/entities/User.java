@@ -29,6 +29,9 @@ public class User {
     
     private int coins = 300;
     
+    @ColumnInfo(name = "badges_count")
+    private int badgesCount = 0;
+    
     @ColumnInfo(name = "is_logged_in")
     private boolean isLoggedIn = false;
 
@@ -114,6 +117,14 @@ public class User {
 
     public void setCoins(int coins) {
         this.coins = coins;
+    }
+
+    public int getBadgesCount() {
+        return badgesCount;
+    }
+
+    public void setBadgesCount(int badgesCount) {
+        this.badgesCount = badgesCount;
     }
 
     public boolean isLoggedIn() {

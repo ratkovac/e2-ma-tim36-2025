@@ -46,6 +46,7 @@ public class GuildFragment extends Fragment {
     private Button leaveGuildButton;
     private Button disbandGuildButton;
     private Button btnGuildChat;
+    private Button btnSpecialMissionProgress;
     private RecyclerView membersRecyclerView;
     private RecyclerView invitesRecyclerView;
     private TextView noGuildText;
@@ -103,6 +104,7 @@ public class GuildFragment extends Fragment {
         leaveGuildButton = view.findViewById(R.id.leave_guild_button);
         disbandGuildButton = view.findViewById(R.id.disband_guild_button);
         btnGuildChat = view.findViewById(R.id.btnGuildChat);
+        btnSpecialMissionProgress = view.findViewById(R.id.btnSpecialMissionProgress);
         membersRecyclerView = view.findViewById(R.id.members_recycler_view);
         invitesRecyclerView = view.findViewById(R.id.invites_recycler_view);
         noGuildText = view.findViewById(R.id.no_guild_text);
@@ -127,6 +129,15 @@ public class GuildFragment extends Fragment {
         leaveGuildButton.setOnClickListener(v -> leaveGuild());
         disbandGuildButton.setOnClickListener(v -> disbandGuild());
         btnGuildChat.setOnClickListener(v -> navigateToGuildChat());
+        btnSpecialMissionProgress.setOnClickListener(v -> navigateToSpecialMissionProgress());
+        View guildProgressBtn = getView() != null ? getView().findViewById(R.id.btnGuildMissionProgress) : null;
+        if (guildProgressBtn != null) {
+            guildProgressBtn.setOnClickListener(v -> navigateToGuildMissionProgress());
+        }
+        View startBtn = getView() != null ? getView().findViewById(R.id.btnStartSpecialMission) : null;
+        if (startBtn != null) {
+            startBtn.setOnClickListener(v -> startSpecialMission());
+        }
     }
     
     private void loadData() {
@@ -275,6 +286,13 @@ public class GuildFragment extends Fragment {
             inviteFriendsButton.setVisibility(isLeader ? View.VISIBLE : View.GONE);
             disbandGuildButton.setVisibility(isLeader ? View.VISIBLE : View.GONE);
             btnGuildChat.setVisibility(View.VISIBLE);
+            if (btnSpecialMissionProgress != null) btnSpecialMissionProgress.setVisibility(View.VISIBLE);
+            View guildProgressBtn = getView() != null ? getView().findViewById(R.id.btnGuildMissionProgress) : null;
+            if (guildProgressBtn != null) guildProgressBtn.setVisibility(View.VISIBLE);
+            View startBtn = getView() != null ? getView().findViewById(R.id.btnStartSpecialMission) : null;
+            if (startBtn != null) {
+                startBtn.setVisibility(isLeader ? View.VISIBLE : View.GONE);
+            }
             
         } else {
             guildNameText.setText("NO GUILD");
@@ -286,6 +304,13 @@ public class GuildFragment extends Fragment {
             leaveGuildButton.setVisibility(View.GONE);
             disbandGuildButton.setVisibility(View.GONE);
             btnGuildChat.setVisibility(View.GONE);
+            if (btnSpecialMissionProgress != null) btnSpecialMissionProgress.setVisibility(View.GONE);
+            View guildProgressBtn2 = getView() != null ? getView().findViewById(R.id.btnGuildMissionProgress) : null;
+            if (guildProgressBtn2 != null) guildProgressBtn2.setVisibility(View.GONE);
+            View startBtn2 = getView() != null ? getView().findViewById(R.id.btnStartSpecialMission) : null;
+            if (startBtn2 != null) {
+                startBtn2.setVisibility(View.GONE);
+            }
             noGuildText.setVisibility(View.VISIBLE);
         }
         
@@ -335,6 +360,49 @@ public class GuildFragment extends Fragment {
         }
         
         Navigation.findNavController(requireView()).navigate(R.id.navigation_guild_chat);
+    }
+    
+    private void navigateToSpecialMissionProgress() {
+        if (currentGuild == null) {
+            Toast.makeText(requireContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Navigation.findNavController(requireView()).navigate(R.id.navigation_special_mission_progress);
+    }
+
+    private void navigateToGuildMissionProgress() {
+        if (currentGuild == null) {
+            Toast.makeText(requireContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Navigation.findNavController(requireView()).navigate(R.id.navigation_guild_mission_progress);
+    }
+
+    private void startSpecialMission() {
+        if (currentGuild == null) {
+            Toast.makeText(requireContext(), "You are not in any guild!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        guildService.startSpecialMission(currentGuild.getGuildId(), new GuildService.GuildMissionCallback() {
+            @Override
+            public void onSuccess(String message, com.habitrpg.taskmanager.data.database.entities.SpecialMission mission) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                        loadData();
+                    });
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }
+        });
     }
     
     private void leaveGuild() {

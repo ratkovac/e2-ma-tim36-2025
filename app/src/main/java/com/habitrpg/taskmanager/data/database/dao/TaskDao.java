@@ -55,11 +55,20 @@ public interface TaskDao {
     @Query("SELECT COUNT(*) FROM tasks WHERE user_id = :userId AND difficulty = :difficulty AND importance = :importance AND DATE(start_date) = :date AND status = 'active'")
     int getTaskCountByDifficultyAndImportanceForDate(String userId, String difficulty, String importance, String date);
     
+    @Query("SELECT COUNT(*) FROM tasks WHERE user_id = :userId AND difficulty = :difficulty AND importance = :importance AND DATE(start_date) = :date AND status = 'completed'")
+    int getCompletedTaskCountByDifficultyAndImportanceForDate(String userId, String difficulty, String importance, String date);
+    
     @Query("SELECT COUNT(*) FROM tasks WHERE user_id = :userId AND importance = 'special' AND DATE(start_date) >= :monthStart AND DATE(start_date) <= :monthEnd AND status = 'active'")
     int getSpecialTaskCountForMonth(String userId, String monthStart, String monthEnd);
     
+    @Query("SELECT COUNT(*) FROM tasks WHERE user_id = :userId AND importance = 'special' AND DATE(start_date) >= :monthStart AND DATE(start_date) <= :monthEnd AND status = 'completed'")
+    int getCompletedSpecialTaskCountForMonth(String userId, String monthStart, String monthEnd);
+    
     @Query("SELECT COUNT(*) FROM tasks WHERE user_id = :userId AND difficulty = 'extreme' AND DATE(start_date) >= :weekStart AND DATE(start_date) <= :weekEnd AND status = 'active'")
     int getExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd);
+    
+    @Query("SELECT COUNT(*) FROM tasks WHERE user_id = :userId AND difficulty = 'extreme' AND DATE(start_date) >= :weekStart AND DATE(start_date) <= :weekEnd AND status = 'completed'")
+    int getCompletedExtremeTaskCountForWeek(String userId, String weekStart, String weekEnd);
     
     @Query("SELECT * FROM tasks WHERE user_id = :userId")
     List<Task> getAllTasksByUser(String userId);

@@ -45,6 +45,16 @@
         android:label="Guild" />
 
     <fragment
+        android:id="@+id/navigation_special_mission_progress"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.SpecialMissionProgressFragment"
+        android:label="Special Mission Progress" />
+
+    <fragment
+        android:id="@+id/navigation_guild_mission_progress"
+        android:name="com.habitrpg.taskmanager.presentation.fragments.GuildMissionProgressFragment"
+        android:label="Guild Mission Progress" />
+
+    <fragment
         android:id="@+id/navigation_task_creation"
         android:name="com.habitrpg.taskmanager.presentation.fragments.TaskCreationFragment"
         android:label="Create Task" />

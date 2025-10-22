@@ -139,6 +139,36 @@
             android:textSize="16sp"
             android:visibility="gone" />
 
+        <!-- Special Mission Progress Button -->
+        <Button
+            android:id="@+id/btnSpecialMissionProgress"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginBottom="16dp"
+            android:text="Special Mission Progress"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <!-- Start Special Mission Button (leader only) -->
+        <Button
+            android:id="@+id/btnStartSpecialMission"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginBottom="16dp"
+            android:text="Start Special Mission"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <!-- Guild Mission Progress Button (global) -->
+        <Button
+            android:id="@+id/btnGuildMissionProgress"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginBottom="16dp"
+            android:text="Guild Mission Progress"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
         <!-- Pending Invites Section -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"

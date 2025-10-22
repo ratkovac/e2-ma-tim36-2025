@@ -14,6 +14,8 @@ import com.habitrpg.taskmanager.data.database.dao.TaskCompletionDao;
 import com.habitrpg.taskmanager.data.database.dao.TaskDao;
 import com.habitrpg.taskmanager.data.database.dao.UserDao;
 import com.habitrpg.taskmanager.data.database.dao.UserStatisticsDao;
+import com.habitrpg.taskmanager.data.database.dao.SpecialMissionDao;
+import com.habitrpg.taskmanager.data.database.dao.SpecialMissionProgressDao;
 import com.habitrpg.taskmanager.data.database.entities.Boss;
 import com.habitrpg.taskmanager.data.database.entities.Category;
 import com.habitrpg.taskmanager.data.database.entities.Equipment;
@@ -27,11 +29,14 @@ import com.habitrpg.taskmanager.data.database.entities.Task;
 import com.habitrpg.taskmanager.data.database.entities.TaskCompletion;
 import com.habitrpg.taskmanager.data.database.entities.User;
 import com.habitrpg.taskmanager.data.database.entities.UserStatistics;
+import com.habitrpg.taskmanager.data.database.entities.SpecialMission;
+import com.habitrpg.taskmanager.data.database.entities.SpecialMissionProgress;
 
 @Database(
         entities = {User.class, Category.class, Task.class, TaskCompletion.class, UserStatistics.class, 
-                    Friend.class, FriendRequest.class, Guild.class, GuildMember.class, GuildInvite.class, GuildMessage.class, Boss.class, Equipment.class},
-    version = 8,
+                    Friend.class, FriendRequest.class, Guild.class, GuildMember.class, GuildInvite.class, GuildMessage.class, Boss.class, Equipment.class,
+                    SpecialMission.class, SpecialMissionProgress.class},
+    version = 9,
     exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
@@ -47,6 +52,8 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract GuildDao guildDao();
     public abstract BossDao bossDao();
     public abstract EquipmentDao equipmentDao();
+    public abstract SpecialMissionDao specialMissionDao();
+    public abstract SpecialMissionProgressDao specialMissionProgressDao();
     
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {

@@ -132,6 +132,7 @@ public class ProfileFragment extends Fragment {
         binding.tvLevel.setText(String.valueOf(user.getLevel()));
         binding.tvPowerPoints.setText(String.valueOf(user.getPowerPoints()));
         binding.tvCoins.setText(String.valueOf(user.getCoins()));
+        binding.tvBadges.setText(String.valueOf(user.getBadgesCount()));
 
         int totalXP = user.getExperiencePoints();
         int currentLevel = user.getLevel();
